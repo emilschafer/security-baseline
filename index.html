@@ -473,8 +473,9 @@ tbody tr:hover td { background: var(--bg); }
 
   <main class="main">
     <!-- DEMO NOTICE -->
-    <div id="demo-notice" class="setup-notice" style="display:none;">
-      ⚠️ Demo-tilstand — data gemmes kun lokalt i denne browser og deles ikke med andre
+    <div id="demo-notice" class="setup-notice" style="display:none;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+      <span>⚠️ Demo-tilstand — data gemmes kun lokalt i denne browser og deles ikke med andre</span>
+      <button class="btn btn-primary btn-sm" onclick="doMsalLogin()" style="white-space:nowrap;">🔐 Log ind med Microsoft</button>
     </div>
 
     <!-- DASHBOARD -->
@@ -829,6 +830,15 @@ function saveConfig() {
   localStorage.setItem('baseline_config', JSON.stringify(APP_CONFIG));
   document.getElementById('config-screen').style.display = 'none';
   initMsal();
+}
+
+function doMsalLogin() {
+  if (msalInstance) {
+    msalInstance.loginRedirect({ scopes: ['Sites.ReadWrite.All', 'User.Read'] });
+  } else {
+    APP_CONFIG.demoMode = false;
+    initMsal();
+  }
 }
 
 function doLogout() {
