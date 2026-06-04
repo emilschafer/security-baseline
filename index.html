@@ -857,14 +857,32 @@ async function loadAll() {
 }
 
 async function loadChecks() {
-  if (APP_CONFIG.demoMode) {
-    checks = demoData.checks.filter(c => !c.Archived).map(normalizeCheck).sort((a,b) => a.sort_order - b.sort_order || a.check_id.localeCompare(b.check_id));
-    return;
+  // Checks loader altid fra checks.json — hurtigt og kræver ingen SharePoint-rettigheder
+  try {
+    const r = await fetch('checks.json');
+    const raw = await r.json();
+    checks = raw.filter(c => !c.archived).map((c, i) => ({
+      spId: String(i+1),
+      check_id: c.check_id,
+      title: c.title,
+      type: c.type,
+      profiles: c.profiles || [],
+      description: c.description || '',
+      rationale: c.rationale || '',
+      impact: c.impact || '',
+      audit_ui: c.audit_ui || [],
+      audit_ps: c.audit_ps || '',
+      remediation: c.remediation || [],
+      section: c.section || '',
+      subsection: c.subsection || '',
+      sort_order: c.sort_order || i,
+      archived: false
+    })).sort((a,b) => a.check_id.localeCompare(b.check_id));
+  } catch(e) {
+    console.error('Kunne ikke hente checks.json:', e);
+    checks = [];
   }
-  const items = await getListItems(listIds.checks);
-  checks = items.filter(i => !i.Archived && i.CheckId).map(normalizeCheck).sort((a,b) => (a.sort_order||0)-(b.sort_order||0) || a.check_id.localeCompare(b.check_id));
 }
-
 async function loadCustomers() {
   if (APP_CONFIG.demoMode) {
     customers = demoData.customers.filter(c => c.Active).map(normalizeCustomer);
