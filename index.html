@@ -887,11 +887,7 @@ tbody tr:hover td { background: var(--bg); }
           </div>
           <div class="progress-track"><div class="progress-fill" id="prog-fill" style="width:0%"></div></div>
         </div>
-        <button class="btn btn-sm" onclick="showReportHistory()" id="btn-history" style="display:none;">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-          Historik
-        </button>
-        <button class="btn btn-success btn-sm" onclick="openPDFModal()">
+<button class="btn btn-success btn-sm" onclick="openPDFModal()">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
           Eksporter PDF
         </button>
@@ -1279,6 +1275,25 @@ function showPage(name, btn) {
 }
 
 // ── DASHBOARD ─────────────────────────────────────
+async function downloadLatestReport(customerId, customerName) {
+  if (APP_CONFIG.demoMode) { showToast('Ikke tilgængeligt i demo-tilstand', 'error'); return; }
+  showToast('Henter seneste rapport...');
+  try {
+    const items = await getListItems(listIds.assessments);
+    const report = items.find(i => i.CustomerId === customerId && i.CheckSpId === 'LATEST_REPORT');
+    if (!report || !report.pdf) { showToast('Ingen rapport fundet — generer en PDF først', 'error'); return; }
+    const binary = atob(report.pdf);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    const blob = new Blob([bytes], { type: 'application/pdf' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'Baseline-' + customerName.replace(/\s+/g,'-') + '.pdf';
+    a.click(); URL.revokeObjectURL(url);
+    showToast('Rapport downloadet ✓', 'success');
+  } catch(e) { showToast('Fejl: ' + e.message, 'error'); }
+}
+
 function renderDashboard() {
   document.getElementById('stat-customers').textContent = customers.length;
   document.getElementById('stat-checks').textContent = checks.length;
@@ -1303,7 +1318,10 @@ function renderDashboard() {
       <td class="td-name">${c.name}</td>
       <td>${c.org_nr || '–'}</td>
       <td>${c.contact || '–'}</td>
-      <td><button class="btn btn-sm" onclick="goToCustomer('${c.spId}')">Åbn gennemgang →</button></td>
+      <td class="td-actions">
+        <button class="btn btn-sm" onclick="goToCustomer('${c.spId}')">Åbn →</button>
+        <button class="btn btn-sm btn-success" onclick="downloadLatestReport('${c.spId}','${c.name}')">📄 Rapport</button>
+      </td>
     </tr>`).join('');
   document.getElementById('dash-table').innerHTML = `
     <table>
@@ -1373,7 +1391,6 @@ function renderChecklist() {
   el.innerHTML = html;
   document.getElementById('nav-controls').style.display = 'flex';
   document.getElementById('nav-info').textContent = list.length + ' punkter';
-  const hbtn = document.getElementById('btn-history'); if(hbtn) hbtn.style.display = '';
   updateProgress();
 }
 
@@ -1507,77 +1524,7 @@ function openPDFModal() {
   document.getElementById('modal-pdf').classList.add('open');
 }
 
-async function saveReportSnapshot(score, noteConstraints, noteNext) {
-  if (!selectedCustomer || APP_CONFIG.demoMode) return;
-  try {
-    const snapshot = {
-      type: 'REPORT_SNAPSHOT',
-      version: Date.now(),
-      date: new Date().toISOString(),
-      customerName: selectedCustomer.name,
-      score: score || '',
-      noteConstraints: noteConstraints || '',
-      noteNext: noteNext || '',
-      assessments: {}
-    };
-    checks.forEach(c => {
-      const a = assessments[c.spId];
-      if (a && a.status !== 'none') {
-        snapshot.assessments[c.check_id] = { status: a.status, comment: a.comment || '' };
-      }
-    });
-    await createItem(listIds.assessments, {
-      CustomerId: selectedCustomer.spId,
-      CheckSpId: 'REPORT_SNAPSHOT',
-      Status: 'snapshot',
-      Comment: JSON.stringify(snapshot),
-      UpdatedBy: currentUser?.email || ''
-    });
-    console.log('✅ Rapport snapshot gemt');
-  } catch(e) {
-    console.warn('Kunne ikke gemme snapshot:', e);
-  }
-}
 
-async function showReportHistory() {
-  if (!selectedCustomer) return;
-  document.getElementById('modal-history').classList.add('open');
-  const body = document.getElementById('history-body');
-  body.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--text2);">Henter historik...</div>';
-  try {
-    const items = await getListItems(listIds.assessments);
-    const snapshots = items
-      .filter(i => i.CustomerId === selectedCustomer.spId && i.CheckSpId === 'REPORT_SNAPSHOT')
-      .map(i => { try { return JSON.parse(i.Comment); } catch(e) { return null; } })
-      .filter(Boolean)
-      .sort((a,b) => b.version - a.version);
-    
-    if (!snapshots.length) {
-      body.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--text2);">Ingen tidligere rapporter. Generer en PDF for at gemme.</div>';
-      return;
-    }
-    
-    body.innerHTML = snapshots.map(function(s, i) {
-      var date = new Date(s.date).toLocaleDateString('da-DK', {day:'2-digit',month:'long',year:'numeric'});
-      var time = new Date(s.date).toLocaleTimeString('da-DK', {hour:'2-digit',minute:'2-digit'});
-      var done = Object.values(s.assessments).filter(function(a){return a.status !== 'none';}).length;
-      var total = checks.length;
-      var pct = Math.round(done/total*100);
-      var scoreHtml = s.score ? '<div style="font-size:12px;color:var(--text2);margin-bottom:4px;">Secure Score: <strong>'+s.score+'%</strong></div>' : '';
-      var notesHtml = s.noteConstraints ? '<div style="font-size:12px;color:var(--text2);background:var(--surface2);padding:6px 8px;border-radius:var(--radius);margin-top:6px;">'+s.noteConstraints+'</div>' : '';
-      var nextHtml = s.noteNext ? '<div style="font-size:12px;color:var(--text2);margin-top:4px;">'+s.noteNext+'</div>' : '';
-      return '<div style="border:0.5px solid var(--border);border-radius:var(--radius-lg);padding:14px 16px;margin-bottom:10px;">' +
-        '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">' +
-        '<div><div style="font-weight:500;font-size:14px;">Rapport v'+(snapshots.length - i)+'</div>' +
-        '<div style="font-size:12px;color:var(--text2);">'+date+' kl. '+time+'</div></div>' +
-        '<div style="text-align:right;"><div style="font-size:20px;font-weight:600;color:var(--green);">'+pct+'%</div>' +
-        '<div style="font-size:11px;color:var(--text3);">'+done+'/'+total+' vurderet</div></div></div>' +
-        scoreHtml + notesHtml + nextHtml + '</div>';
-    }).join('');
-  } catch(e) {
-    body.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--red);">Fejl: ' + e.message + '</div>';
-  }
-}
 
 async function doGeneratePDF() {
   const score = document.getElementById('pdf-score').value;
@@ -1721,7 +1668,30 @@ async function doGeneratePDF() {
     document.getElementById('pdf-success-body').style.display='block';
     document.getElementById('pdf-modal-footer').style.display='none';
     showToast('PDF downloadet ✓', 'success');
-    saveReportSnapshot(score, noteConstraints, noteNext);
+    // Gem PDF som seneste rapport i SharePoint
+    if (!APP_CONFIG.demoMode && selectedCustomer) {
+      try {
+        const pdfBase64 = btoa(String.fromCharCode(...new Uint8Array(doc.output('arraybuffer'))));
+        const reportData = {
+          type: 'LATEST_REPORT',
+          date: new Date().toISOString(),
+          filename: 'Baseline-' + selectedCustomer.name.replace(/\s+/g,'-') + '.pdf',
+          score: score || '',
+          notes: noteConstraints || '',
+          next: noteNext || '',
+          pdf: pdfBase64
+        };
+        // Check if existing report exists
+        const items = await getListItems(listIds.assessments);
+        const existing = items.find(i => i.CustomerId === selectedCustomer.spId && i.CheckSpId === 'LATEST_REPORT');
+        if (existing) {
+          await updateItem(listIds.assessments, existing.spId, reportData);
+        } else {
+          await createItem(listIds.assessments, { ...reportData, CustomerId: selectedCustomer.spId, CheckSpId: 'LATEST_REPORT', Status: 'report', UpdatedBy: currentUser?.email||'' });
+        }
+        showToast('Rapport gemt i SharePoint ✓', 'success');
+      } catch(e) { console.warn('Kunne ikke gemme rapport:', e); }
+    }
   } catch(e) { showToast('PDF fejl: '+e.message, 'error'); }
 }
 
@@ -2016,21 +1986,7 @@ initMsal();
 </div>
 
 
-<!-- MODAL: Rapport historik -->
-<div class="modal-overlay" id="modal-history">
-  <div class="modal" style="max-width:580px;">
-    <div class="modal-header">
-      <h2>Rapporthistorik</h2>
-      <button class="close-btn" onclick="closeModal('modal-history')">×</button>
-    </div>
-    <div class="modal-body" id="history-body">
-      <div style="text-align:center;padding:2rem;color:var(--text2);">Henter historik...</div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn" onclick="closeModal('modal-history')">Luk</button>
-    </div>
-  </div>
-</div>
+
 
 </body>
 </html>
