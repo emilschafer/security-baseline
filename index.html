@@ -467,16 +467,13 @@ tbody tr:hover td { background: var(--bg); }
         <div class="avatar" id="user-avatar">–</div>
         <span id="user-name-display">–</span>
       </div>
-      <button class="btn btn-sm btn-ghost" onclick="doLogout()">Log ud</button>
+      <button class="btn btn-sm btn-ghost" id="login-logout-btn" onclick="currentUser ? doLogout() : doMsalLogin()">Log ind</button>
     </div>
   </header>
 
   <main class="main">
     <!-- DEMO NOTICE -->
-    <div id="demo-notice" class="setup-notice" style="display:none;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
-      <span>⚠️ Demo-tilstand — data gemmes kun lokalt i denne browser og deles ikke med andre</span>
-      <button class="btn btn-primary btn-sm" onclick="doMsalLogin()" style="white-space:nowrap;">🔐 Log ind med Microsoft</button>
-    </div>
+    
 
     <!-- DASHBOARD -->
     <div class="page active" id="page-dashboard">
@@ -729,6 +726,7 @@ async function initMsal() {
     currentUser = { name: account.name, email: account.username, role: 'admin' };
     document.getElementById('user-name-display').textContent = account.name?.split(' ')[0] || account.username;
     document.getElementById('user-avatar').textContent = (account.name||account.username).slice(0,2).toUpperCase();
+    const llb = document.getElementById('login-logout-btn'); if(llb) llb.textContent = 'Log ud';
     await getToken();
     await getSiteId();
     await ensureLists();
@@ -828,7 +826,7 @@ async function initDemoMode() {
   currentUser = { name: 'Demo Bruger', email: 'demo@local', role: 'admin' };
   document.getElementById('user-name-display').textContent = 'Demo';
   document.getElementById('user-avatar').textContent = 'DB';
-  document.getElementById('demo-notice').style.display = 'block';
+  
   showApp();
   loadAll();
 }
@@ -861,7 +859,7 @@ function doMsalLogin() {
       currentUser = { name: resp.account.name, email: resp.account.username, role: 'admin' };
       document.getElementById('user-name-display').textContent = resp.account.name?.split(' ')[0] || resp.account.username;
       document.getElementById('user-avatar').textContent = (resp.account.name||resp.account.username).slice(0,2).toUpperCase();
-      document.getElementById('demo-notice').style.display = 'none';
+      
       accessToken = null;
       await getToken();
       await getSiteId();
