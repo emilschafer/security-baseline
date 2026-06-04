@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Security Baseline Tracker</title>
+<!-- v2 -->
 <script>/** @license
  *
  * jsPDF - PDF Document creation from JavaScript
@@ -954,7 +955,7 @@ tbody tr:hover td { background: var(--bg); }
         </div>
       </div>
       <div class="form-group">
-        <label>Kundebegrænsninger og aftaler</label>
+        <label>Noter</label>
         <textarea id="pdf-note-constraints" placeholder="Fx: Kunden ønsker ikke at tilkøbe P1 licenser, men vil gerne have det lavet med de licenser de allerede har…"></textarea>
         <div style="font-size:11px;color:var(--text3);margin-top:3px;">Vises som fremhævet boks øverst i rapporten</div>
       </div>
@@ -1618,7 +1619,7 @@ async function doGeneratePDF() {
       doc.setDrawColor(253,230,138);doc.roundedRect(ml,y,cw,14,2,2,'S');
       doc.setFillColor(217,119,6);doc.rect(ml,y,3,14,'F');
       doc.setFontSize(8);doc.setFont('helvetica','bold');doc.setTextColor(146,64,14);
-      doc.text('KUNDEBEGRÆNSNINGER OG AFTALER',ml+6,y+5);
+      doc.text('NOTER',ml+6,y+5);
       doc.setFont('helvetica','normal');doc.setTextColor(92,43,12);
       const lines=doc.splitTextToSize(noteConstraints,cw-10);
       doc.text(lines.slice(0,2),ml+6,y+10); y+=18;
