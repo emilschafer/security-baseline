@@ -750,50 +750,10 @@ async function getSiteId() {
 }
 
 async function ensureLists() {
-  const d = await callGraph('GET', `/sites/${siteId}/lists?$select=id,name`);
-  const existing = {};
-  d.value.forEach(l => { existing[l.name] = l.id; });
-
-  const listDefs = [
-    { name: 'BaselineChecks', columns: [
-      { name: 'CheckId', text: {} },
-      { name: 'CheckTitle', text: {} },
-      { name: 'CheckType', text: {} },
-      { name: 'Profiles', text: { allowMultipleLines: true } },
-      { name: 'Description', text: { allowMultipleLines: true } },
-      { name: 'Rationale', text: { allowMultipleLines: true } },
-      { name: 'Impact', text: { allowMultipleLines: true } },
-      { name: 'AuditSteps', text: { allowMultipleLines: true } },
-      { name: 'SortOrder', number: {} },
-      { name: 'Archived', boolean: {} }
-    ]},
-    { name: 'Customers', columns: [
-      { name: 'CustomerName', text: {} },
-      { name: 'OrgNr', text: {} },
-      { name: 'Contact', text: {} },
-      { name: 'Active', boolean: {} }
-    ]},
-    { name: 'Assessments', columns: [
-      { name: 'CustomerId', text: {} },
-      { name: 'CheckSpId', text: {} },
-      { name: 'Status', text: {} },
-      { name: 'Comment', text: { allowMultipleLines: true } },
-      { name: 'UpdatedBy', text: {} }
-    ]}
-  ];
-
-  for (const def of listDefs) {
-    if (existing[def.name]) {
-      listIds[def.name === 'BaselineChecks' ? 'checks' : def.name.toLowerCase()] = existing[def.name];
-    } else {
-      const l = await callGraph('POST', `/sites/${siteId}/lists`, { displayName: def.name, list: { template: 'genericList' } });
-      const key = def.name === 'BaselineChecks' ? 'checks' : def.name.toLowerCase();
-      listIds[key] = l.id;
-      for (const col of def.columns) {
-        try { await callGraph('POST', `/sites/${siteId}/lists/${l.id}/columns`, { name: col.name, ...col }); } catch(e) {}
-      }
-    }
-  }
+  // Lists er oprettet manuelt i SharePoint — brug hardcodede IDs
+  listIds.checks = 'a80d263e-f468-4bc5-b77a-10ff175477e6';
+  listIds.customers = 'c9323d0a-a1e3-46b5-a7d3-c77077c0c0ee';
+  listIds.assessments = '4d2fa73e-7869-4344-bd67-f0682116739a';
 }
 
 // ── GRAPH CRUD ───────────────────────────────────
