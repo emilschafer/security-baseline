@@ -1253,7 +1253,7 @@ function normalizeCheck(i) {
     audit_ui: tryParse(i.AuditUI || i.AuditSteps, []),
     audit_ps: i.AuditPS || '',
     remediation: tryParse(i.Remediation, []),
-    section: i.Section || '',
+    section: i.Section || i.CheckSection || '',
     subsection: i.Subsection || '',
     sort_order: i.SortOrder || 0,
     archived: i.Archived || false
@@ -1789,20 +1789,25 @@ async function deleteCustomer(spId) {
 function renderChecksTable() {
   const rows = checks.map(c => `
     <tr>
-      <td><code style="font-family:'DM Mono',monospace;font-size:12px;color:var(--accent);">${c.check_id}</code></td>
+      <td><code style="font-family:monospace;font-size:12px;color:var(--accent);">${c.check_id}</code></td>
       <td class="td-name">${c.title}</td>
+      <td style="font-size:11px;color:var(--text2);">${c.section||'–'}</td>
       <td>${c.profiles.join(', ')||'–'}</td>
       <td><span class="tag ${c.type==='Automated'?'tag-auto':'tag-manual'}">${c.type}</span></td>
       <td class="td-actions">
-        <button class="btn btn-sm" onclick="openCheckModal('${c.spId}')">Rediger</button>
+        <button class="btn btn-sm" onclick="openCheckModalBySpId('${c.spId}')">Rediger</button>
         <button class="btn btn-sm btn-danger" onclick="archiveCheck('${c.spId}')">Arkivér</button>
       </td>
     </tr>`).join('');
   document.getElementById('checks-table').innerHTML = `
     <table>
-      <thead><tr><th>ID</th><th>Titel</th><th>Profiler</th><th>Type</th><th>Handlinger</th></tr></thead>
+      <thead><tr><th>ID</th><th>Titel</th><th>Kategori</th><th>Profiler</th><th>Type</th><th>Handlinger</th></tr></thead>
       <tbody>${rows||'<tr><td colspan="5" class="empty-state">Ingen punkter endnu</td></tr>'}</tbody>
     </table>`;
+}
+
+function openCheckModalBySpId(spId) {
+  openCheckModal(spId);
 }
 
 function openCheckModal(spId) {
@@ -1818,6 +1823,8 @@ function openCheckModal(spId) {
   document.getElementById('check-rationale').value = c?.rationale||'';
   document.getElementById('check-impact').value = c?.impact||'';
   document.getElementById('check-sort').value = c?.sort_order||0;
+  const secEl = document.getElementById('check-section');
+  if (secEl) secEl.value = c?.section || 'Microsoft 365 Admin Center';
   renderProfileChips(); renderAuditStepInputs();
   document.getElementById('modal-check').classList.add('open');
 }
@@ -1846,11 +1853,12 @@ async function saveCheck() {
   const fields = {
     CheckId:checkId, CheckTitle:title,
     CheckType:document.getElementById('check-type').value,
+    Section:document.getElementById('check-section')?.value || 'Microsoft 365 Admin Center',
     Profiles:JSON.stringify(currentProfiles),
     Description:document.getElementById('check-description').value,
     Rationale:document.getElementById('check-rationale').value,
     Impact:document.getElementById('check-impact').value,
-    AuditSteps:JSON.stringify(currentAuditSteps.filter(s=>s.trim())),
+    AuditUI:JSON.stringify(currentAuditSteps.filter(s=>s.trim())),
     SortOrder:parseInt(document.getElementById('check-sort').value)||0,
     Archived:false
   };
@@ -1865,7 +1873,7 @@ async function saveCheck() {
     closeModal('modal-check');
     await loadChecks();
     renderChecksTable();
-    renderChecklist();
+    if (selectedCustomer) renderChecklist();
     showToast('Punkt gemt ✓','success');
   } catch(e) { showToast(e.message,'error'); }
 }
@@ -2002,6 +2010,20 @@ initMsal();
         <label>Audit trin</label>
         <div id="audit-steps-list"></div>
         <button class="btn btn-sm" style="margin-top:6px;" onclick="addAuditStep()">+ Tilføj trin</button>
+      </div>
+      <div class="form-group">
+        <label>Kategori (section)</label>
+        <select id="check-section">
+          <option value="Microsoft 365 Admin Center">Microsoft 365 Admin Center</option>
+          <option value="Microsoft Defender">Microsoft Defender</option>
+          <option value="Microsoft Purview">Microsoft Purview</option>
+          <option value="Microsoft Intune Admin Center">Microsoft Intune Admin Center</option>
+          <option value="Microsoft Entra Admin Center">Microsoft Entra Admin Center</option>
+          <option value="Exchange Admin Center">Exchange Admin Center</option>
+          <option value="SharePoint Admin Center">SharePoint Admin Center</option>
+          <option value="Microsoft Teams Admin Center">Microsoft Teams Admin Center</option>
+          <option value="Microsoft Fabric">Microsoft Fabric</option>
+        </select>
       </div>
       <div class="form-group"><label>Sorteringsrækkefølge</label><input type="number" id="check-sort" value="0"></div>
     </div>
