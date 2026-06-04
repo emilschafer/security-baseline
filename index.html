@@ -1576,8 +1576,8 @@ async function doGeneratePDF() {
     y = 52;
 
     // Summary bar
-    doc.setFillColor(248,249,251); doc.rect(0,y-2,pw,26,'F');
-    doc.setDrawColor(229,231,235); doc.line(0,y+24,pw,y+24);
+    doc.setFillColor(248,249,251); doc.rect(0,y-2,pw,46,'F');
+    doc.setDrawColor(229,231,235); doc.line(0,y+44,pw,y+44);
     const counts = {implemented:0,review:0,accepted:0,declined:0,none:0};
     checks.forEach(c=>{const s=assessments[c.spId]?.status||'none';counts[s]++;});
 
@@ -1599,12 +1599,17 @@ async function doGeneratePDF() {
       doc.setFillColor(...scC); doc.rect(ml+45,y+17,50*(sc/100),2,'F');
     }
 
-    const pills=[{l:`${counts.implemented} Implemented`,c:[22,163,74]},{l:`${counts.accepted} Accepted`,c:[37,99,235]},{l:`${counts.review} Under review`,c:[217,119,6]},{l:`${counts.declined} Declined`,c:[220,38,38]},{l:`${counts.none} Ikke vurderet`,c:[156,163,175]}];
-    let py2=y+4; let px=ml+100;
-    doc.setFontSize(8); doc.setFont('helvetica','bold'); doc.setTextColor(107,114,128);
+    const pills=[{l:`${counts.implemented}  Implemented`,c:[22,163,74]},{l:`${counts.accepted}  Accepted`,c:[37,99,235]},{l:`${counts.review}  Under review`,c:[217,119,6]},{l:`${counts.declined}  Declined`,c:[220,38,38]},{l:`${counts.none}  Ikke vurderet`,c:[156,163,175]}];
+    let py2=y+4; let px=ml+95;
+    doc.setFontSize(7); doc.setFont('helvetica','bold'); doc.setTextColor(107,114,128);
     doc.text('FORDELING', px, py2); py2+=5;
-    pills.forEach(p=>{doc.setFontSize(8);doc.setFont('helvetica','bold');doc.setTextColor(...p.c);doc.text('■ '+p.l,px,py2);py2+=4.5;});
-    y += 30;
+    pills.forEach(p=>{
+      doc.setFillColor(...p.c);
+      doc.circle(px+1.5, py2-1.5, 1.5, 'F');
+      doc.setFontSize(7.5);doc.setFont('helvetica','bold');doc.setTextColor(...p.c);
+      doc.text(p.l, px+6, py2); py2+=4.8;
+    });
+    y += 48;
 
     // Notes
     if(noteConstraints) {
