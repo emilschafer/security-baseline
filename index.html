@@ -696,7 +696,7 @@ tbody tr:hover td { background: var(--bg); }
 .td-actions { display: flex; gap: 6px; }
 
 /* ── MODAL ──────────────────────────────────── */
-.modal-overlay { position: fixed; inset: 0; background: rgba(15,23,42,.4); z-index: 1000; display: none; align-items: center; justify-content: center; padding: 1rem; backdrop-filter: blur(4px); }
+.modal-overlay { position: fixed; inset: 0; background: rgba(15,23,42,.4); z-index: 10000; display: none; align-items: center; justify-content: center; padding: 1rem; backdrop-filter: blur(4px); transform: translateZ(0); }
 .modal-overlay.open { display: flex; }
 .modal { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); width: 100%; max-width: 640px; max-height: 90vh; overflow-y: auto; box-shadow: var(--shadow-md); }
 .modal-header { display: flex; align-items: center; justify-content: space-between; padding: 1.25rem 1.5rem; border-bottom: 1px solid var(--border); position: sticky; top: 0; background: var(--surface); z-index: 1; }
@@ -929,117 +929,8 @@ tbody tr:hover td { background: var(--bg); }
   </main>
 </div>
 
-<!-- MODAL: Customer -->
-<div class="modal-overlay" id="modal-customer">
-  <div class="modal">
-    <div class="modal-header">
-      <h2 id="modal-customer-title">Ny kunde</h2>
-      <button class="close-btn" onclick="closeModal('modal-customer')">×</button>
-    </div>
-    <div class="modal-body">
-      <input type="hidden" id="customer-sp-id">
-      <div class="form-group"><label>Kundenavn *</label><input type="text" id="customer-name" placeholder="Acme Corp A/S"></div>
-      <div class="form-row">
-        <div class="form-group"><label>CVR / Org.nr</label><input type="text" id="customer-orgnr" placeholder="12345678"></div>
-        <div class="form-group"><label>Kontaktperson</label><input type="text" id="customer-contact" placeholder="Navn, email"></div>
-      </div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn" onclick="closeModal('modal-customer')">Annuller</button>
-      <button class="btn btn-primary" onclick="saveCustomer()">Gem kunde</button>
-    </div>
-  </div>
-</div>
 
-<!-- MODAL: Check -->
-<div class="modal-overlay" id="modal-check">
-  <div class="modal">
-    <div class="modal-header">
-      <h2 id="modal-check-title">Nyt baseline punkt</h2>
-      <button class="close-btn" onclick="closeModal('modal-check')">×</button>
-    </div>
-    <div class="modal-body">
-      <input type="hidden" id="check-sp-id">
-      <div class="form-row">
-        <div class="form-group"><label>ID *</label><input type="text" id="check-id-input" placeholder="1.1.1"></div>
-        <div class="form-group"><label>Type</label>
-          <select id="check-type"><option value="Automated">Automated</option><option value="Manual">Manual</option></select>
-        </div>
-      </div>
-      <div class="form-group"><label>Titel *</label><input type="text" id="check-title-input" placeholder="Ensure..."></div>
-      <div class="form-group">
-        <label>Profile Applicability</label>
-        <div style="display:flex;gap:8px;">
-          <input type="text" id="check-profile-input" placeholder="E3 Level 1" style="flex:1;">
-          <button class="btn btn-sm" onclick="addProfile()">+ Tilføj</button>
-        </div>
-        <div class="chip-row" id="profile-chips"></div>
-      </div>
-      <div class="form-group"><label>Beskrivelse</label><textarea id="check-description" rows="4" placeholder="Hvad handler dette punkt om?"></textarea></div>
-      <div class="form-row">
-        <div class="form-group"><label>Rationale</label><textarea id="check-rationale" rows="3" placeholder="Hvorfor er dette vigtigt?"></textarea></div>
-        <div class="form-group"><label>Impact</label><textarea id="check-impact" rows="3" placeholder="Konsekvens ved implementering?"></textarea></div>
-      </div>
-      <div class="form-group">
-        <label>Audit trin</label>
-        <div id="audit-steps-list"></div>
-        <button class="btn btn-sm" style="margin-top:6px;" onclick="addAuditStep()">+ Tilføj trin</button>
-      </div>
-      <div class="form-group"><label>Sorteringsrækkefølge</label><input type="number" id="check-sort" value="0"></div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn" onclick="closeModal('modal-check')">Annuller</button>
-      <button class="btn btn-primary" onclick="saveCheck()">Gem punkt</button>
-    </div>
-  </div>
 
-<!-- MODAL: PDF Export med noter -->
-<div class="modal-overlay" id="modal-pdf">
-  <div class="modal" style="max-width:540px;">
-    <div class="modal-header">
-      <h2>Eksporter rapport</h2>
-      <button class="close-btn" onclick="closeModal('modal-pdf')">×</button>
-    </div>
-    <div class="modal-body" id="pdf-form-body">
-      <div class="form-group">
-        <label>Microsoft Secure Score</label>
-        <div style="display:flex;align-items:center;gap:10px;">
-          <input type="number" id="pdf-score" min="0" max="100" placeholder="fx 37" style="max-width:100px;" oninput="updateScoreBar(this.value)">
-          <div style="flex:1;background:var(--bg2);border-radius:99px;height:6px;overflow:hidden;">
-            <div id="score-bar" style="height:100%;border-radius:99px;width:0%;background:var(--text3);transition:width .3s,background .3s;"></div>
-          </div>
-          <span id="score-pct" style="font-size:12px;font-weight:500;min-width:36px;color:var(--text3);">–</span>
-        </div>
-      </div>
-      <div class="form-group">
-        <label>Kundebegrænsninger og aftaler</label>
-        <textarea id="pdf-note-constraints" placeholder="Fx: Kunden ønsker ikke at tilkøbe P1 licenser, men vil gerne have det lavet med de licenser de allerede har…"></textarea>
-        <div style="font-size:11px;color:var(--text3);margin-top:3px;">Vises som fremhævet boks øverst i rapporten</div>
-      </div>
-      <div class="form-group">
-        <label>Næste skridt og anbefalinger</label>
-        <textarea id="pdf-note-next" placeholder="Fx: Opfølgningsmøde planlagt 15. juni — fokus på CA og MFA…" style="min-height:70px;"></textarea>
-      </div>
-      <div class="form-group" style="margin-bottom:0;">
-        <label>Intern note (vises ikke i kundens rapport)</label>
-        <textarea id="pdf-note-internal" placeholder="Fx: Book via Bo direkte — kunden er svær at nå…" style="min-height:58px;background:var(--surface2);"></textarea>
-      </div>
-    </div>
-    <div class="modal-body" id="pdf-success-body" style="display:none;text-align:center;padding:2rem;">
-      <div style="width:44px;height:44px;border-radius:50%;background:var(--green-bg);border:1px solid var(--green-border);display:flex;align-items:center;justify-content:center;margin:0 auto 12px;font-size:22px;">✓</div>
-      <div style="font-size:15px;font-weight:500;margin-bottom:4px;color:var(--text);">Rapport downloadet</div>
-      <div style="font-size:13px;color:var(--text2);">PDF'en er gemt på din computer.</div>
-      <button class="btn btn-sm" onclick="closeModal('modal-pdf')" style="margin-top:16px;">Luk</button>
-    </div>
-    <div class="modal-footer" id="pdf-modal-footer">
-      <button class="btn" onclick="closeModal('modal-pdf')">Annuller</button>
-      <button class="btn btn-success" onclick="doGeneratePDF()">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-        Generer og download PDF
-      </button>
-    </div>
-  </div>
-</div>
 
 
 <div id="toast"></div>
@@ -1916,5 +1807,118 @@ function showToast(msg, type='') {
 document.getElementById('config-screen').style.display = 'none';
 initMsal();
 </script>
+
+
+<!-- MODAL: Customer -->
+<div class="modal-overlay" id="modal-customer">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="modal-customer-title">Ny kunde</h2>
+      <button class="close-btn" onclick="closeModal('modal-customer')">×</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="customer-sp-id">
+      <div class="form-group"><label>Kundenavn *</label><input type="text" id="customer-name" placeholder="Acme Corp A/S"></div>
+      <div class="form-row">
+        <div class="form-group"><label>CVR / Org.nr</label><input type="text" id="customer-orgnr" placeholder="12345678"></div>
+        <div class="form-group"><label>Kontaktperson</label><input type="text" id="customer-contact" placeholder="Navn, email"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('modal-customer')">Annuller</button>
+      <button class="btn btn-primary" onclick="saveCustomer()">Gem kunde</button>
+    </div>
+  </div>
+</div>
+<!-- MODAL: Check -->
+<div class="modal-overlay" id="modal-check">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="modal-check-title">Nyt baseline punkt</h2>
+      <button class="close-btn" onclick="closeModal('modal-check')">×</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="check-sp-id">
+      <div class="form-row">
+        <div class="form-group"><label>ID *</label><input type="text" id="check-id-input" placeholder="1.1.1"></div>
+        <div class="form-group"><label>Type</label>
+          <select id="check-type"><option value="Automated">Automated</option><option value="Manual">Manual</option></select>
+        </div>
+      </div>
+      <div class="form-group"><label>Titel *</label><input type="text" id="check-title-input" placeholder="Ensure..."></div>
+      <div class="form-group">
+        <label>Profile Applicability</label>
+        <div style="display:flex;gap:8px;">
+          <input type="text" id="check-profile-input" placeholder="E3 Level 1" style="flex:1;">
+          <button class="btn btn-sm" onclick="addProfile()">+ Tilføj</button>
+        </div>
+        <div class="chip-row" id="profile-chips"></div>
+      </div>
+      <div class="form-group"><label>Beskrivelse</label><textarea id="check-description" rows="4" placeholder="Hvad handler dette punkt om?"></textarea></div>
+      <div class="form-row">
+        <div class="form-group"><label>Rationale</label><textarea id="check-rationale" rows="3" placeholder="Hvorfor er dette vigtigt?"></textarea></div>
+        <div class="form-group"><label>Impact</label><textarea id="check-impact" rows="3" placeholder="Konsekvens ved implementering?"></textarea></div>
+      </div>
+      <div class="form-group">
+        <label>Audit trin</label>
+        <div id="audit-steps-list"></div>
+        <button class="btn btn-sm" style="margin-top:6px;" onclick="addAuditStep()">+ Tilføj trin</button>
+      </div>
+      <div class="form-group"><label>Sorteringsrækkefølge</label><input type="number" id="check-sort" value="0"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('modal-check')">Annuller</button>
+      <button class="btn btn-primary" onclick="saveCheck()">Gem punkt</button>
+    </div>
+  </div>
+
+
+<!-- MODAL: PDF Export med noter -->
+<div class="modal-overlay" id="modal-pdf">
+  <div class="modal" style="max-width:540px;">
+    <div class="modal-header">
+      <h2>Eksporter rapport</h2>
+      <button class="close-btn" onclick="closeModal('modal-pdf')">×</button>
+    </div>
+    <div class="modal-body" id="pdf-form-body">
+      <div class="form-group">
+        <label>Microsoft Secure Score</label>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <input type="number" id="pdf-score" min="0" max="100" placeholder="fx 37" style="max-width:100px;" oninput="updateScoreBar(this.value)">
+          <div style="flex:1;background:var(--bg2);border-radius:99px;height:6px;overflow:hidden;">
+            <div id="score-bar" style="height:100%;border-radius:99px;width:0%;background:var(--text3);transition:width .3s,background .3s;"></div>
+          </div>
+          <span id="score-pct" style="font-size:12px;font-weight:500;min-width:36px;color:var(--text3);">–</span>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Kundebegrænsninger og aftaler</label>
+        <textarea id="pdf-note-constraints" placeholder="Fx: Kunden ønsker ikke at tilkøbe P1 licenser, men vil gerne have det lavet med de licenser de allerede har…"></textarea>
+        <div style="font-size:11px;color:var(--text3);margin-top:3px;">Vises som fremhævet boks øverst i rapporten</div>
+      </div>
+      <div class="form-group">
+        <label>Næste skridt og anbefalinger</label>
+        <textarea id="pdf-note-next" placeholder="Fx: Opfølgningsmøde planlagt 15. juni — fokus på CA og MFA…" style="min-height:70px;"></textarea>
+      </div>
+      <div class="form-group" style="margin-bottom:0;">
+        <label>Intern note (vises ikke i kundens rapport)</label>
+        <textarea id="pdf-note-internal" placeholder="Fx: Book via Bo direkte — kunden er svær at nå…" style="min-height:58px;background:var(--surface2);"></textarea>
+      </div>
+    </div>
+    <div class="modal-body" id="pdf-success-body" style="display:none;text-align:center;padding:2rem;">
+      <div style="width:44px;height:44px;border-radius:50%;background:var(--green-bg);border:1px solid var(--green-border);display:flex;align-items:center;justify-content:center;margin:0 auto 12px;font-size:22px;">✓</div>
+      <div style="font-size:15px;font-weight:500;margin-bottom:4px;color:var(--text);">Rapport downloadet</div>
+      <div style="font-size:13px;color:var(--text2);">PDF'en er gemt på din computer.</div>
+      <button class="btn btn-sm" onclick="closeModal('modal-pdf')" style="margin-top:16px;">Luk</button>
+    </div>
+    <div class="modal-footer" id="pdf-modal-footer">
+      <button class="btn" onclick="closeModal('modal-pdf')">Annuller</button>
+      <button class="btn btn-success" onclick="doGeneratePDF()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Generer og download PDF
+      </button>
+    </div>
+  </div>
+</div>
 </body>
 </html>
