@@ -1597,34 +1597,29 @@ async function showReportHistory() {
       .sort((a,b) => b.version - a.version);
     
     if (!snapshots.length) {
-      body.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--text2);">Ingen tidligere rapporter fundet.<br>Generer en PDF for at gemme en rapport.</div>';
+      body.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--text2);">Ingen tidligere rapporter. Generer en PDF for at gemme.</div>';
       return;
     }
     
-    body.innerHTML = snapshots.map((s, i) => {
-      const date = new Date(s.date).toLocaleDateString('da-DK', {day:'2-digit',month:'long',year:'numeric'});
-      const time = new Date(s.date).toLocaleTimeString('da-DK', {hour:'2-digit',minute:'2-digit'});
-      const done = Object.values(s.assessments).filter(a => a.status !== 'none').length;
-      const total = checks.length;
-      const pct = Math.round(done/total*100);
-      return \`<div style="border:0.5px solid var(--border);border-radius:var(--radius-lg);padding:14px 16px;margin-bottom:10px;">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
-          <div>
-            <div style="font-weight:500;font-size:14px;">Rapport v\${snapshots.length - i}</div>
-            <div style="font-size:12px;color:var(--text2);">\${date} kl. \${time}</div>
-          </div>
-          <div style="text-align:right;">
-            <div style="font-size:20px;font-weight:600;color:var(--green);">\${pct}%</div>
-            <div style="font-size:11px;color:var(--text3);">\${done}/\${total} vurderet</div>
-          </div>
-        </div>
-        \${s.score ? \`<div style="font-size:12px;color:var(--text2);margin-bottom:4px;">Secure Score: <strong>\${s.score}%</strong></div>\` : ''}
-        \${s.noteConstraints ? \`<div style="font-size:12px;color:var(--text2);background:var(--surface2);padding:6px 8px;border-radius:var(--radius);margin-top:6px;">\${s.noteConstraints}</div>\` : ''}
-        \${s.noteNext ? \`<div style="font-size:12px;color:var(--text2);margin-top:4px;">\${s.noteNext}</div>\` : ''}
-      </div>\`;
+    body.innerHTML = snapshots.map(function(s, i) {
+      var date = new Date(s.date).toLocaleDateString('da-DK', {day:'2-digit',month:'long',year:'numeric'});
+      var time = new Date(s.date).toLocaleTimeString('da-DK', {hour:'2-digit',minute:'2-digit'});
+      var done = Object.values(s.assessments).filter(function(a){return a.status !== 'none';}).length;
+      var total = checks.length;
+      var pct = Math.round(done/total*100);
+      var scoreHtml = s.score ? '<div style="font-size:12px;color:var(--text2);margin-bottom:4px;">Secure Score: <strong>'+s.score+'%</strong></div>' : '';
+      var notesHtml = s.noteConstraints ? '<div style="font-size:12px;color:var(--text2);background:var(--surface2);padding:6px 8px;border-radius:var(--radius);margin-top:6px;">'+s.noteConstraints+'</div>' : '';
+      var nextHtml = s.noteNext ? '<div style="font-size:12px;color:var(--text2);margin-top:4px;">'+s.noteNext+'</div>' : '';
+      return '<div style="border:0.5px solid var(--border);border-radius:var(--radius-lg);padding:14px 16px;margin-bottom:10px;">' +
+        '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">' +
+        '<div><div style="font-weight:500;font-size:14px;">Rapport v'+(snapshots.length - i)+'</div>' +
+        '<div style="font-size:12px;color:var(--text2);">'+date+' kl. '+time+'</div></div>' +
+        '<div style="text-align:right;"><div style="font-size:20px;font-weight:600;color:var(--green);">'+pct+'%</div>' +
+        '<div style="font-size:11px;color:var(--text3);">'+done+'/'+total+' vurderet</div></div></div>' +
+        scoreHtml + notesHtml + nextHtml + '</div>';
     }).join('');
   } catch(e) {
-    body.innerHTML = \`<div style="text-align:center;padding:2rem;color:var(--red);">Fejl: \${e.message}</div>\`;
+    body.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--red);">Fejl: ' + e.message + '</div>';
   }
 }
 
