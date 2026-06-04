@@ -1279,16 +1279,14 @@ async function downloadLatestReport(customerId, customerName) {
   if (APP_CONFIG.demoMode) { showToast('Ikke tilgængeligt i demo-tilstand', 'error'); return; }
   showToast('Henter seneste rapport...');
   try {
-    const items = await getListItems(listIds.assessments);
-    const report = items.find(i => i.CustomerId === customerId && i.CheckSpId === 'LATEST_REPORT');
-    if (!report || !report.pdf) { showToast('Ingen rapport fundet — generer en PDF først', 'error'); return; }
-    const binary = atob(report.pdf);
-    const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-    const blob = new Blob([bytes], { type: 'application/pdf' });
+    const fileName = 'Baseline-' + customerName.replace(/[^a-zA-Z0-9]/g,'-') + '.pdf';
+    const fileUrl = `https://addvisiondk.sharepoint.com/sites/SecurityBaseline/_api/web/GetFileByServerRelativeUrl('/sites/SecurityBaseline/Delte%20dokumenter/${fileName}')/$value`;
+    const r = await fetch(fileUrl, { credentials: 'include' });
+    if (!r.ok) { showToast('Ingen rapport fundet — generer en PDF først', 'error'); return; }
+    const blob = await r.blob();
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url; a.download = 'Baseline-' + customerName.replace(/\s+/g,'-') + '.pdf';
+    a.href = url; a.download = fileName;
     a.click(); URL.revokeObjectURL(url);
     showToast('Rapport downloadet ✓', 'success');
   } catch(e) { showToast('Fejl: ' + e.message, 'error'); }
@@ -1668,34 +1666,28 @@ async function doGeneratePDF() {
     document.getElementById('pdf-success-body').style.display='block';
     document.getElementById('pdf-modal-footer').style.display='none';
     showToast('PDF downloadet ✓', 'success');
-    // Gem PDF som seneste rapport i SharePoint
+    // Gem PDF direkte i SharePoint Documents biblioteket
     if (!APP_CONFIG.demoMode && selectedCustomer) {
       try {
-        const pdfBytes = new Uint8Array(doc.output('arraybuffer'));
-        let pdfBase64 = '';
-        const chunkSize = 8192;
-        for (let i = 0; i < pdfBytes.length; i += chunkSize) {
-          pdfBase64 += String.fromCharCode(...pdfBytes.subarray(i, i + chunkSize));
-        }
-        pdfBase64 = btoa(pdfBase64);
-        const reportData = {
-          type: 'LATEST_REPORT',
-          date: new Date().toISOString(),
-          filename: 'Baseline-' + selectedCustomer.name.replace(/\s+/g,'-') + '.pdf',
-          score: score || '',
-          notes: noteConstraints || '',
-          next: noteNext || '',
-          pdf: pdfBase64
-        };
-        // Check if existing report exists
-        const items = await getListItems(listIds.assessments);
-        const existing = items.find(i => i.CustomerId === selectedCustomer.spId && i.CheckSpId === 'LATEST_REPORT');
-        if (existing) {
-          await updateItem(listIds.assessments, existing.spId, reportData);
+        const pdfBytes = doc.output('arraybuffer');
+        const fileName = 'Baseline-' + selectedCustomer.name.replace(/[^a-zA-Z0-9]/g,'-') + '.pdf';
+        const uploadUrl = `https://addvisiondk.sharepoint.com/sites/SecurityBaseline/_api/web/GetFolderByServerRelativeUrl('Delte%20dokumenter')/Files/add(url='${fileName}',overwrite=true)`;
+        const digest = await getRequestDigest();
+        const r = await fetch(uploadUrl, {
+          method: 'POST',
+          headers: {
+            'Accept': 'application/json;odata=nometadata',
+            'X-RequestDigest': digest,
+            'content-length': pdfBytes.byteLength
+          },
+          credentials: 'include',
+          body: pdfBytes
+        });
+        if (r.ok) {
+          showToast('Rapport gemt i SharePoint ✓', 'success');
         } else {
-          await createItem(listIds.assessments, { ...reportData, CustomerId: selectedCustomer.spId, CheckSpId: 'LATEST_REPORT', Status: 'report', UpdatedBy: currentUser?.email||'' });
+          console.warn('Kunne ikke gemme i Documents:', r.status);
         }
-        showToast('Rapport gemt i SharePoint ✓', 'success');
       } catch(e) { console.warn('Kunne ikke gemme rapport:', e); }
     }
   } catch(e) { showToast('PDF fejl: '+e.message, 'error'); }
