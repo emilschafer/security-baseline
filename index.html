@@ -695,44 +695,41 @@ let listIds = { checks: null, customers: null, assessments: null };
 
 async function initMsal() {
   if (APP_CONFIG.demoMode) { initDemoMode(); return; }
-  // If opened as local file, fall back to demo mode
   if (window.location.protocol === 'file:') { initDemoMode(); return; }
   try {
-  msalInstance = new msal.PublicClientApplication({
-    auth: { clientId: APP_CONFIG.clientId, authority: `https://login.microsoftonline.com/${APP_CONFIG.tenantId}`, redirectUri: window.location.href.split('?')[0] },
-    cache: { cacheLocation: 'sessionStorage' }
-  });
-  await msalInstance.initialize();
-  const resp = await msalInstance.handleRedirectPromise();
-  let account = resp?.account || msalInstance.getAllAccounts()[0];
-  if (!account) {
-    await msalInstance.loginPopup({ scopes: ['Sites.ReadWrite.All', 'User.Read'] }).then(async (resp) => {
-    msalInstance.setActiveAccount(resp.account);
-    currentUser = { name: resp.account.name, email: resp.account.username, role: 'admin' };
-    document.getElementById('user-name-display').textContent = resp.account.name?.split(' ')[0] || resp.account.username;
-    document.getElementById('user-avatar').textContent = (resp.account.name||resp.account.username).slice(0,2).toUpperCase();
-    document.getElementById('demo-notice').style.display = 'none';
+    msalInstance = new msal.PublicClientApplication({
+      auth: {
+        clientId: APP_CONFIG.clientId,
+        authority: `https://login.microsoftonline.com/${APP_CONFIG.tenantId}`,
+        redirectUri: window.location.origin + '/blank.html'
+      },
+      cache: { cacheLocation: 'sessionStorage' }
+    });
+    await msalInstance.initialize();
+
+    // Check for existing account first
+    let account = msalInstance.getAllAccounts()[0];
+    if (!account) {
+      // No account - show demo mode with login button
+      initDemoMode();
+      return;
+    }
+
+    // Account exists - set it and load
+    msalInstance.setActiveAccount(account);
+    currentUser = { name: account.name, email: account.username, role: 'admin' };
+    document.getElementById('user-name-display').textContent = account.name?.split(' ')[0] || account.username;
+    document.getElementById('user-avatar').textContent = (account.name||account.username).slice(0,2).toUpperCase();
     await getToken();
     await getSiteId();
+    await ensureLists();
+    showApp();
     await loadAll();
-  }).catch(e => console.error('Login fejlede:', e));
-    return;
-  }
-  msalInstance.setActiveAccount(account);
-  currentUser = { name: account.name, email: account.username, role: 'admin' };
-  document.getElementById('user-name-display').textContent = account.name?.split(' ')[0] || account.username;
-  document.getElementById('user-avatar').textContent = (account.name||account.username).slice(0,2).toUpperCase();
-  await getToken();
-  await getSiteId();
-  await ensureLists();
-  showApp();
-  await loadAll();
   } catch(e) {
     console.warn('MSAL fejlede, åbner demo-tilstand:', e);
     initDemoMode();
   }
 }
-
 async function getToken() {
   const result = await msalInstance.acquireTokenSilent({ scopes: ['Sites.ReadWrite.All'], account: msalInstance.getActiveAccount() });
   accessToken = result.accessToken;
@@ -842,21 +839,20 @@ function saveConfig() {
 }
 
 function doMsalLogin() {
-  if (msalInstance) {
-    msalInstance.loginPopup({ scopes: ['Sites.ReadWrite.All', 'User.Read'] }).then(async (resp) => {
-    msalInstance.setActiveAccount(resp.account);
-    currentUser = { name: resp.account.name, email: resp.account.username, role: 'admin' };
-    document.getElementById('user-name-display').textContent = resp.account.name?.split(' ')[0] || resp.account.username;
-    document.getElementById('user-avatar').textContent = (resp.account.name||resp.account.username).slice(0,2).toUpperCase();
-    document.getElementById('demo-notice').style.display = 'none';
-    await getToken();
-    await getSiteId();
-    await loadAll();
-  }).catch(e => console.error('Login fejlede:', e));
-  } else {
-    APP_CONFIG.demoMode = false;
-    initMsal();
-  }
+  if (!msalInstance) return;
+  msalInstance.loginPopup({ scopes: ['Sites.ReadWrite.All', 'User.Read'] })
+    .then(async (resp) => {
+      msalInstance.setActiveAccount(resp.account);
+      currentUser = { name: resp.account.name, email: resp.account.username, role: 'admin' };
+      document.getElementById('user-name-display').textContent = resp.account.name?.split(' ')[0] || resp.account.username;
+      document.getElementById('user-avatar').textContent = (resp.account.name||resp.account.username).slice(0,2).toUpperCase();
+      document.getElementById('demo-notice').style.display = 'none';
+      await getToken();
+      await getSiteId();
+      await ensureLists();
+      await loadAll();
+    })
+    .catch(e => console.error('Login fejlede:', e));
 }
 
 function doLogout() {
