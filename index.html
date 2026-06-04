@@ -706,11 +706,25 @@ async function initMsal() {
       cache: { cacheLocation: 'localStorage' }
     });
     await msalInstance.initialize();
+
+    // Try to get account from cache
     let account = msalInstance.getAllAccounts()[0];
     if (!account) {
-      initDemoMode();
-      return;
+      // No cached account - try silent SSO with hint from tenant
+      try {
+        const silentResp = await msalInstance.ssoSilent({
+          scopes: ['Sites.ReadWrite.All', 'User.Read'],
+          loginHint: undefined
+        });
+        account = silentResp.account;
+        msalInstance.setActiveAccount(account);
+      } catch(silentErr) {
+        // SSO failed - show demo with login button
+        initDemoMode();
+        return;
+      }
     }
+
     msalInstance.setActiveAccount(account);
     currentUser = { name: account.name, email: account.username, role: 'admin' };
     document.getElementById('user-name-display').textContent = account.name?.split(' ')[0] || account.username;
