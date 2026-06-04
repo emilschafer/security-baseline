@@ -1813,7 +1813,7 @@ function openCheckModalBySpId(spId) {
 function openCheckModal(spId) {
   const c = spId ? checks.find(x=>x.spId===spId) : null;
   currentProfiles = c?[...c.profiles]:[];
-  currentAuditSteps = c?[...c.audit_steps]:[];
+  currentAuditSteps = c?[...(c.audit_ui||c.audit_steps||[])]:[];
   document.getElementById('modal-check-title').textContent = c?'Rediger punkt':'Nyt baseline punkt';
   document.getElementById('check-sp-id').value = c?.spId||'';
   document.getElementById('check-id-input').value = c?.check_id||'';
