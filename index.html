@@ -1277,18 +1277,36 @@ function showPage(name, btn) {
 // ── DASHBOARD ─────────────────────────────────────
 async function downloadLatestReport(customerId, customerName) {
   if (APP_CONFIG.demoMode) { showToast('Ikke tilgængeligt i demo-tilstand', 'error'); return; }
-  showToast('Henter seneste rapport...');
+  showToast('Genererer seneste rapport...');
   try {
-    const fileName = 'Baseline-' + customerName.replace(/[^a-zA-Z0-9]/g,'-') + '.pdf';
-    const fileUrl = `https://addvisiondk.sharepoint.com/sites/SecurityBaseline/_api/web/GetFileByServerRelativeUrl('/sites/SecurityBaseline/Delte%20dokumenter/${fileName}')/$value`;
-    const r = await fetch(fileUrl, { credentials: 'include' });
-    if (!r.ok) { showToast('Ingen rapport fundet — generer en PDF først', 'error'); return; }
-    const blob = await r.blob();
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = fileName;
-    a.click(); URL.revokeObjectURL(url);
-    showToast('Rapport downloadet ✓', 'success');
+    // Hent rapport-metadata fra SharePoint
+    const items = await getListItems(listIds.assessments);
+    const reportItem = items.find(i => i.CustomerId === customerId && i.CheckSpId === 'LATEST_REPORT');
+    if (!reportItem) { showToast('Ingen rapport fundet — generer en PDF først', 'error'); return; }
+    let meta = {};
+    try { meta = JSON.parse(reportItem.Comment || '{}'); } catch(e) {}
+
+    // Hent assessments for denne kunde
+    const custAssessments = {};
+    items.filter(i => i.CustomerId === customerId && i.CheckSpId !== 'LATEST_REPORT')
+      .forEach(i => { custAssessments[i.CheckSpId] = { status: i.Status||'none', comment: i.Comment||'' }; });
+
+    // Find customer
+    const customer = customers.find(c => c.spId === customerId);
+    if (!customer) { showToast('Kunde ikke fundet', 'error'); return; }
+
+    // Gem nuværende state midlertidigt
+    const prevCustomer = selectedCustomer;
+    const prevAssessments = assessments;
+    selectedCustomer = customer;
+    assessments = custAssessments;
+
+    // Generer PDF med gemte noter
+    await generatePDFWithMeta(meta.score||'', meta.notes||'', meta.next||'');
+
+    // Gendan state
+    selectedCustomer = prevCustomer;
+    assessments = prevAssessments;
   } catch(e) { showToast('Fejl: ' + e.message, 'error'); }
 }
 
@@ -1528,6 +1546,10 @@ async function doGeneratePDF() {
   const score = document.getElementById('pdf-score').value;
   const noteConstraints = document.getElementById('pdf-note-constraints').value.trim();
   const noteNext = document.getElementById('pdf-note-next').value.trim();
+  await generatePDFWithMeta(score, noteConstraints, noteNext);
+}
+
+async function generatePDFWithMeta(score, noteConstraints, noteNext) {
   showToast('Genererer PDF…');
   try {
     const { jsPDF } = window.jspdf;
@@ -1666,29 +1688,32 @@ async function doGeneratePDF() {
     document.getElementById('pdf-success-body').style.display='block';
     document.getElementById('pdf-modal-footer').style.display='none';
     showToast('PDF downloadet ✓', 'success');
-    // Gem PDF direkte i SharePoint Documents biblioteket
+    // Gem rapport-metadata i SharePoint
     if (!APP_CONFIG.demoMode && selectedCustomer) {
       try {
-        const pdfBytes = doc.output('arraybuffer');
-        const fileName = 'Baseline-' + selectedCustomer.name.replace(/[^a-zA-Z0-9]/g,'-') + '.pdf';
-        const uploadUrl = `https://addvisiondk.sharepoint.com/sites/SecurityBaseline/_api/web/GetFolderByServerRelativeUrl('Delte%20dokumenter')/Files/add(url='${fileName}',overwrite=true)`;
-        const digest = await getRequestDigest();
-        const r = await fetch(uploadUrl, {
-          method: 'POST',
-          headers: {
-            'Accept': 'application/json;odata=nometadata',
-            'X-RequestDigest': digest,
-            'content-length': pdfBytes.byteLength
-          },
-          credentials: 'include',
-          body: pdfBytes
+        const reportMeta = JSON.stringify({
+          type: 'LATEST_REPORT',
+          date: new Date().toISOString(),
+          score: score || '',
+          notes: noteConstraints || '',
+          next: noteNext || '',
+          generatedBy: currentUser?.name || ''
         });
-        if (r.ok) {
-          showToast('Rapport gemt i SharePoint ✓', 'success');
+        const items = await getListItems(listIds.assessments);
+        const existing = items.find(i => i.CustomerId === selectedCustomer.spId && i.CheckSpId === 'LATEST_REPORT');
+        if (existing) {
+          await updateItem(listIds.assessments, existing.spId, {
+            CustomerId: selectedCustomer.spId, CheckSpId: 'LATEST_REPORT',
+            Status: 'report', Comment: reportMeta, UpdatedBy: currentUser?.email||''
+          });
         } else {
-          console.warn('Kunne ikke gemme i Documents:', r.status);
+          await createItem(listIds.assessments, {
+            CustomerId: selectedCustomer.spId, CheckSpId: 'LATEST_REPORT',
+            Status: 'report', Comment: reportMeta, UpdatedBy: currentUser?.email||''
+          });
         }
-      } catch(e) { console.warn('Kunne ikke gemme rapport:', e); }
+        showToast('Rapport og noter gemt ✓', 'success');
+      } catch(e) { console.warn('Kunne ikke gemme rapport-metadata:', e); }
     }
   } catch(e) { showToast('PDF fejl: '+e.message, 'error'); }
 }
