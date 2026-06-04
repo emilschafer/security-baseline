@@ -697,36 +697,22 @@ async function initMsal() {
   if (APP_CONFIG.demoMode) { initDemoMode(); return; }
   if (window.location.protocol === 'file:') { initDemoMode(); return; }
   try {
-    msalInstance = new msal.PublicClientApplication({
-      auth: {
-        clientId: APP_CONFIG.clientId,
-        authority: `https://login.microsoftonline.com/${APP_CONFIG.tenantId}`,
-        redirectUri: window.location.origin + '/blank.html'
-      },
-      cache: { cacheLocation: 'sessionStorage' }
+    // Test om brugeren er logget ind på SharePoint via cookie
+    const test = await fetch('https://addvisiondk.sharepoint.com/sites/SecurityBaseline/_api/web/currentuser?$select=Title,Email', {
+      headers: { 'Accept': 'application/json;odata=nometadata' },
+      credentials: 'include'
     });
-    await msalInstance.initialize();
-
-    // Check for existing account first
-    let account = msalInstance.getAllAccounts()[0];
-    if (!account) {
-      // No account - show demo mode with login button
-      initDemoMode();
-      return;
-    }
-
-    // Account exists - set it and load
-    msalInstance.setActiveAccount(account);
-    currentUser = { name: account.name, email: account.username, role: 'admin' };
-    document.getElementById('user-name-display').textContent = account.name?.split(' ')[0] || account.username;
-    document.getElementById('user-avatar').textContent = (account.name||account.username).slice(0,2).toUpperCase();
-    await getToken();
+    if (!test.ok) { initDemoMode(); return; }
+    const user = await test.json();
+    currentUser = { name: user.Title, email: user.Email, role: 'admin' };
+    document.getElementById('user-name-display').textContent = user.Title?.split(' ')[0] || user.Email;
+    document.getElementById('user-avatar').textContent = (user.Title||user.Email||'?').slice(0,2).toUpperCase();
     await getSiteId();
     await ensureLists();
     showApp();
     await loadAll();
   } catch(e) {
-    console.warn('MSAL fejlede, åbner demo-tilstand:', e);
+    console.warn('SP login fejlede, åbner demo-tilstand:', e);
     initDemoMode();
   }
 }
@@ -745,20 +731,40 @@ async function getToken() {
 }
 
 async function callGraph(method, endpoint, body) {
-  if (!accessToken) await getToken();
-  const r = await fetch(`https://graph.microsoft.com/v1.0${endpoint}`, {
+  // Using SharePoint REST API directly - works with user's SharePoint session
+  const baseUrl = 'https://addvisiondk.sharepoint.com/sites/SecurityBaseline/_api';
+  const r = await fetch(`${baseUrl}${endpoint}`, {
     method,
-    headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+    headers: {
+      'Accept': 'application/json;odata=nometadata',
+      'Content-Type': 'application/json;odata=nometadata',
+      'X-RequestDigest': await getRequestDigest()
+    },
+    credentials: 'include',
     body: body ? JSON.stringify(body) : undefined
   });
-  if (r.status === 401) { await getToken(); return callGraph(method, endpoint, body); }
-  if (!r.ok) { const e = await r.json(); throw new Error(e.error?.message || 'Graph API fejl'); }
+  if (!r.ok) { const e = await r.json().catch(()=>({})); throw new Error(e.error?.message || `HTTP ${r.status}`); }
   if (r.status === 204) return null;
   return r.json();
 }
 
+let _digest = null;
+let _digestExpiry = 0;
+async function getRequestDigest() {
+  if (_digest && Date.now() < _digestExpiry) return _digest;
+  const r = await fetch('https://addvisiondk.sharepoint.com/sites/SecurityBaseline/_api/contextinfo', {
+    method: 'POST',
+    headers: { 'Accept': 'application/json;odata=nometadata' },
+    credentials: 'include'
+  });
+  const d = await r.json();
+  _digest = d.FormDigestValue;
+  _digestExpiry = Date.now() + (d.FormDigestTimeoutSeconds - 30) * 1000;
+  return _digest;
+}
+
 async function getSiteId() {
-  // Hardcode siteId — vi kender den allerede
+  // Ikke nødvendigt med SP REST API
   siteId = 'addvisiondk.sharepoint.com,8efaad5a-0f64-4d59-b4a8-4de5c4aa9d2b,0480b735-3daf-47c0-af4c-565f16d98731';
 }
 
@@ -771,17 +777,29 @@ async function ensureLists() {
 
 // ── GRAPH CRUD ───────────────────────────────────
 async function getListItems(listId) {
-  const d = await callGraph('GET', `/sites/${siteId}/lists/${listId}/items?$top=999&$expand=fields&$select=id,fields`);
-  return d.value.map(i => {
-    try { return { spId: i.id, ...JSON.parse(i.fields.Title) }; }
-    catch(e) { return { spId: i.id }; }
+  const d = await callGraph('GET', `/web/lists/GetById('${listId}')/items?$select=Id,Title&$top=999`);
+  return (d.value||[]).map(i => {
+    try { return { spId: String(i.Id), ...JSON.parse(i.Title) }; }
+    catch(e) { return { spId: String(i.Id) }; }
   });
 }
 async function createItem(listId, data) {
-  return callGraph('POST', `/sites/${siteId}/lists/${listId}/items`, { fields: { Title: JSON.stringify(data) } });
+  return callGraph('POST', `/web/lists/GetById('${listId}')/items`, { Title: JSON.stringify(data) });
 }
 async function updateItem(listId, itemId, data) {
-  return callGraph('PATCH', `/sites/${siteId}/lists/${listId}/items/${itemId}/fields`, { Title: JSON.stringify(data) });
+  const r = await fetch(`https://addvisiondk.sharepoint.com/sites/SecurityBaseline/_api/web/lists/GetById('${listId}')/items(${itemId})`, {
+    method: 'POST',
+    headers: {
+      'Accept': 'application/json;odata=nometadata',
+      'Content-Type': 'application/json;odata=nometadata',
+      'X-RequestDigest': await getRequestDigest(),
+      'X-HTTP-Method': 'MERGE',
+      'If-Match': '*'
+    },
+    credentials: 'include',
+    body: JSON.stringify({ Title: JSON.stringify(data) })
+  });
+  return null;
 }
 
 // ── DEMO MODE ────────────────────────────────────
@@ -845,29 +863,9 @@ function saveConfig() {
 }
 
 function doMsalLogin() {
-  if (!msalInstance) return;
-  msalInstance.loginPopup({ scopes: ['Sites.ReadWrite.All', 'User.Read'] })
-    .then(async (resp) => {
-      msalInstance.setActiveAccount(resp.account);
-      currentUser = { name: resp.account.name, email: resp.account.username, role: 'admin' };
-      document.getElementById('user-name-display').textContent = resp.account.name?.split(' ')[0] || resp.account.username;
-      document.getElementById('user-avatar').textContent = (resp.account.name||resp.account.username).slice(0,2).toUpperCase();
-      document.getElementById('demo-notice').style.display = 'none';
-      try {
-        await getToken();
-        await getSiteId();
-        await ensureLists();
-        showApp();
-        await loadAll();
-      } catch(e) {
-        console.error('Fejl efter login:', e);
-        showToast('Fejl ved indlæsning: ' + e.message, 'error');
-      }
-    })
-    .catch(e => {
-      console.error('Login fejlede:', e);
-      showToast('Login fejlede: ' + e.message, 'error');
-    });
+  // Redirect to SharePoint login then back to this page
+  const returnUrl = encodeURIComponent(window.location.href);
+  window.location.href = `https://addvisiondk.sharepoint.com/sites/SecurityBaseline/_layouts/15/authenticate.aspx?Source=${returnUrl}`;
 }
 
 function doLogout() {
