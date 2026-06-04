@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="da">
 <head>
@@ -1871,7 +1872,34 @@ async function saveCheck() {
       else await createItem(listIds.checks, fields);
     }
     closeModal('modal-check');
-    await loadChecks();
+    // For nye punkter - tilføj direkte til checks array (loadChecks henter kun fra checks.json)
+    if (!spId && !APP_CONFIG.demoMode) {
+      // Hent det nyoprettede item fra SharePoint for at få spId
+      const items = await getListItems(listIds.checks);
+      const newItem = items.find(i => i.CheckId === checkId);
+      if (newItem) {
+        const newCheck = normalizeCheck(newItem);
+        checks.push(newCheck);
+        checks.sort((a,b) => a.check_id.localeCompare(b.check_id));
+      }
+    } else {
+      // Ved redigering - opdater i checks array
+      const idx = checks.findIndex(c => c.spId === spId);
+      if (idx >= 0) {
+        checks[idx] = normalizeCheck({
+          spId, CheckId:checkId, CheckTitle:title,
+          CheckType:document.getElementById('check-type').value,
+          Section:document.getElementById('check-section')?.value||'',
+          Profiles:JSON.stringify(currentProfiles),
+          Description:document.getElementById('check-description').value,
+          Rationale:document.getElementById('check-rationale').value,
+          Impact:document.getElementById('check-impact').value,
+          AuditUI:JSON.stringify(currentAuditSteps.filter(s=>s.trim())),
+          SortOrder:parseInt(document.getElementById('check-sort').value)||0,
+          Archived:false
+        });
+      }
+    }
     renderChecksTable();
     if (selectedCustomer) renderChecklist();
     showToast('Punkt gemt ✓','success');
