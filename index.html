@@ -757,16 +757,18 @@ async function ensureLists() {
 }
 
 // ── GRAPH CRUD ───────────────────────────────────
-async function getListItems(listId, filter = '') {
-  const q = filter ? `?$filter=${encodeURIComponent(filter)}&$top=999` : '?$top=999';
-  const d = await callGraph('GET', `/sites/${siteId}/lists/${listId}/items${q}&$expand=fields`);
-  return d.value.map(i => ({ spId: i.id, ...i.fields }));
+async function getListItems(listId) {
+  const d = await callGraph('GET', `/sites/${siteId}/lists/${listId}/items?$top=999&$expand=fields&$select=id,fields`);
+  return d.value.map(i => {
+    try { return { spId: i.id, ...JSON.parse(i.fields.Title) }; }
+    catch(e) { return { spId: i.id }; }
+  });
 }
-async function createItem(listId, fields) {
-  return callGraph('POST', `/sites/${siteId}/lists/${listId}/items`, { fields });
+async function createItem(listId, data) {
+  return callGraph('POST', `/sites/${siteId}/lists/${listId}/items`, { fields: { Title: JSON.stringify(data) } });
 }
-async function updateItem(listId, itemId, fields) {
-  return callGraph('PATCH', `/sites/${siteId}/lists/${listId}/items/${itemId}/fields`, fields);
+async function updateItem(listId, itemId, data) {
+  return callGraph('PATCH', `/sites/${siteId}/lists/${listId}/items/${itemId}/fields`, { Title: JSON.stringify(data) });
 }
 
 // ── DEMO MODE ────────────────────────────────────
@@ -859,8 +861,8 @@ async function loadChecks() {
     checks = demoData.checks.filter(c => !c.Archived).map(normalizeCheck).sort((a,b) => a.sort_order - b.sort_order || a.check_id.localeCompare(b.check_id));
     return;
   }
-  const items = await getListItems(listIds.checks, 'fields/Archived ne true');
-  checks = items.filter(i => !i.Archived).map(normalizeCheck).sort((a,b) => (a.sort_order||0)-(b.sort_order||0) || a.check_id.localeCompare(b.check_id));
+  const items = await getListItems(listIds.checks);
+  checks = items.filter(i => !i.Archived && i.CheckId).map(normalizeCheck).sort((a,b) => (a.sort_order||0)-(b.sort_order||0) || a.check_id.localeCompare(b.check_id));
 }
 
 async function loadCustomers() {
@@ -868,8 +870,8 @@ async function loadCustomers() {
     customers = demoData.customers.filter(c => c.Active).map(normalizeCustomer);
     return;
   }
-  const items = await getListItems(listIds.customers, 'fields/Active eq true');
-  customers = items.filter(i => i.Active !== false).map(normalizeCustomer);
+  const items = await getListItems(listIds.customers);
+  customers = items.filter(i => i.Active !== false && i.CustomerName).map(normalizeCustomer);
 }
 
 async function loadAssessments(customerId) {
@@ -877,9 +879,9 @@ async function loadAssessments(customerId) {
     assessments = demoData.assessments[customerId] || {};
     return;
   }
-  const items = await getListItems(listIds.assessments, `fields/CustomerId eq '${customerId}'`);
+  const items = await getListItems(listIds.assessments);
   assessments = {};
-  items.forEach(i => { assessments[i.CheckSpId] = { spId: i.spId, status: i.Status || 'none', comment: i.Comment || '' }; });
+  items.filter(i => i.CustomerId === customerId).forEach(i => { assessments[i.CheckSpId] = { spId: i.spId, status: i.Status || 'none', comment: i.Comment || '' }; });
 }
 
 function normalizeCheck(i) {
@@ -1090,10 +1092,10 @@ async function saveAssessment(spId) {
       if (!demoData.assessments[selectedCustomer.spId]) demoData.assessments[selectedCustomer.spId] = {};
       demoData.assessments[selectedCustomer.spId][spId] = { ...a };
     } else {
-      const fields = { CustomerId: selectedCustomer.spId, CheckSpId: spId, Status: a.status, Comment: a.comment||'', UpdatedBy: currentUser?.email||'' };
-      if (a.spId) await updateItem(listIds.assessments, a.spId, fields);
+      const data = { CustomerId: selectedCustomer.spId, CheckSpId: spId, Status: a.status, Comment: a.comment||'', UpdatedBy: currentUser?.email||'' };
+      if (a.spId) await updateItem(listIds.assessments, a.spId, data);
       else {
-        const r = await createItem(listIds.assessments, fields);
+        const r = await createItem(listIds.assessments, data);
         assessments[spId].spId = r.id;
       }
     }
@@ -1318,14 +1320,14 @@ async function saveCustomer() {
   const spId = document.getElementById('customer-sp-id').value;
   const name = document.getElementById('customer-name').value.trim();
   if (!name) { showToast('Navn påkrævet','error'); return; }
-  const fields = { CustomerName:name, OrgNr:document.getElementById('customer-orgnr').value, Contact:document.getElementById('customer-contact').value, Active:true };
+  const fields = { CustomerName:name, OrgNr:document.getElementById('customer-orgnr').value, Contact:document.getElementById('customer-contact').value, Active:true }; const data = fields;
   try {
     if (APP_CONFIG.demoMode) {
       if (spId) { const c=demoData.customers.find(x=>x.spId===spId); if(c){c.CustomerName=name;c.OrgNr=fields.OrgNr;c.Contact=fields.Contact;} }
       else { const id=String(Date.now()); demoData.customers.push({spId:id,id,...fields}); }
     } else {
       if (spId) await updateItem(listIds.customers, spId, fields);
-      else await createItem(listIds.customers, fields);
+      else await createItem(listIds.customers, data);
     }
     closeModal('modal-customer');
     await loadCustomers();
