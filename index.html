@@ -885,6 +885,10 @@ tbody tr:hover td { background: var(--bg); }
           </div>
           <div class="progress-track"><div class="progress-fill" id="prog-fill" style="width:0%"></div></div>
         </div>
+        <button class="btn btn-sm" onclick="showReportHistory()" id="btn-history" style="display:none;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          Historik
+        </button>
         <button class="btn btn-success btn-sm" onclick="openPDFModal()">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
           Eksporter PDF
@@ -1413,6 +1417,7 @@ function renderChecklist() {
   el.innerHTML = html;
   document.getElementById('nav-controls').style.display = 'flex';
   document.getElementById('nav-info').textContent = list.length + ' punkter';
+  const hbtn = document.getElementById('btn-history'); if(hbtn) hbtn.style.display = '';
   updateProgress();
 }
 
@@ -1544,6 +1549,83 @@ function openPDFModal() {
   document.getElementById('pdf-success-body').style.display = 'none';
   document.getElementById('pdf-modal-footer').style.display = 'flex';
   document.getElementById('modal-pdf').classList.add('open');
+}
+
+async function saveReportSnapshot(score, noteConstraints, noteNext) {
+  if (!selectedCustomer || APP_CONFIG.demoMode) return;
+  try {
+    const snapshot = {
+      type: 'REPORT_SNAPSHOT',
+      version: Date.now(),
+      date: new Date().toISOString(),
+      customerName: selectedCustomer.name,
+      score: score || '',
+      noteConstraints: noteConstraints || '',
+      noteNext: noteNext || '',
+      assessments: {}
+    };
+    checks.forEach(c => {
+      const a = assessments[c.spId];
+      if (a && a.status !== 'none') {
+        snapshot.assessments[c.check_id] = { status: a.status, comment: a.comment || '' };
+      }
+    });
+    await createItem(listIds.assessments, {
+      CustomerId: selectedCustomer.spId,
+      CheckSpId: 'REPORT_SNAPSHOT',
+      Status: 'snapshot',
+      Comment: JSON.stringify(snapshot),
+      UpdatedBy: currentUser?.email || ''
+    });
+    console.log('✅ Rapport snapshot gemt');
+  } catch(e) {
+    console.warn('Kunne ikke gemme snapshot:', e);
+  }
+}
+
+async function showReportHistory() {
+  if (!selectedCustomer) return;
+  document.getElementById('modal-history').classList.add('open');
+  const body = document.getElementById('history-body');
+  body.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--text2);">Henter historik...</div>';
+  try {
+    const items = await getListItems(listIds.assessments);
+    const snapshots = items
+      .filter(i => i.CustomerId === selectedCustomer.spId && i.CheckSpId === 'REPORT_SNAPSHOT')
+      .map(i => { try { return JSON.parse(i.Comment); } catch(e) { return null; } })
+      .filter(Boolean)
+      .sort((a,b) => b.version - a.version);
+    
+    if (!snapshots.length) {
+      body.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--text2);">Ingen tidligere rapporter fundet.<br>Generer en PDF for at gemme en rapport.</div>';
+      return;
+    }
+    
+    body.innerHTML = snapshots.map((s, i) => {
+      const date = new Date(s.date).toLocaleDateString('da-DK', {day:'2-digit',month:'long',year:'numeric'});
+      const time = new Date(s.date).toLocaleTimeString('da-DK', {hour:'2-digit',minute:'2-digit'});
+      const done = Object.values(s.assessments).filter(a => a.status !== 'none').length;
+      const total = checks.length;
+      const pct = Math.round(done/total*100);
+      return \`<div style="border:0.5px solid var(--border);border-radius:var(--radius-lg);padding:14px 16px;margin-bottom:10px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+          <div>
+            <div style="font-weight:500;font-size:14px;">Rapport v\${snapshots.length - i}</div>
+            <div style="font-size:12px;color:var(--text2);">\${date} kl. \${time}</div>
+          </div>
+          <div style="text-align:right;">
+            <div style="font-size:20px;font-weight:600;color:var(--green);">\${pct}%</div>
+            <div style="font-size:11px;color:var(--text3);">\${done}/\${total} vurderet</div>
+          </div>
+        </div>
+        \${s.score ? \`<div style="font-size:12px;color:var(--text2);margin-bottom:4px;">Secure Score: <strong>\${s.score}%</strong></div>\` : ''}
+        \${s.noteConstraints ? \`<div style="font-size:12px;color:var(--text2);background:var(--surface2);padding:6px 8px;border-radius:var(--radius);margin-top:6px;">\${s.noteConstraints}</div>\` : ''}
+        \${s.noteNext ? \`<div style="font-size:12px;color:var(--text2);margin-top:4px;">\${s.noteNext}</div>\` : ''}
+      </div>\`;
+    }).join('');
+  } catch(e) {
+    body.innerHTML = \`<div style="text-align:center;padding:2rem;color:var(--red);">Fejl: \${e.message}</div>\`;
+  }
 }
 
 async function doGeneratePDF() {
@@ -1688,6 +1770,7 @@ async function doGeneratePDF() {
     document.getElementById('pdf-success-body').style.display='block';
     document.getElementById('pdf-modal-footer').style.display='none';
     showToast('PDF downloadet ✓', 'success');
+    saveReportSnapshot(score, noteConstraints, noteNext);
   } catch(e) { showToast('PDF fejl: '+e.message, 'error'); }
 }
 
@@ -1927,6 +2010,23 @@ initMsal();
       <button class="btn btn-primary" onclick="saveCheck()">Gem punkt</button>
     </div>
   </div>
+
+
+<!-- MODAL: Rapport historik -->
+<div class="modal-overlay" id="modal-history">
+  <div class="modal" style="max-width:580px;">
+    <div class="modal-header">
+      <h2>Rapporthistorik</h2>
+      <button class="close-btn" onclick="closeModal('modal-history')">×</button>
+    </div>
+    <div class="modal-body" id="history-body">
+      <div style="text-align:center;padding:2rem;color:var(--text2);">Henter historik...</div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('modal-history')">Luk</button>
+    </div>
+  </div>
+</div>
 
 </body>
 </html>
