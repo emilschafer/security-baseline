@@ -758,11 +758,8 @@ async function callGraph(method, endpoint, body) {
 }
 
 async function getSiteId() {
-  const url = new URL(APP_CONFIG.siteUrl);
-  const hostname = url.hostname;
-  const path = url.pathname;
-  const d = await callGraph('GET', `/sites/${hostname}:${path}`);
-  siteId = d.id;
+  // Hardcode siteId — vi kender den allerede
+  siteId = 'addvisiondk.sharepoint.com,8efaad5a-0f64-4d59-b4a8-4de5c4aa9d2b,0480b735-3daf-47c0-af4c-565f16d98731';
 }
 
 async function ensureLists() {
