@@ -731,8 +731,17 @@ async function initMsal() {
   }
 }
 async function getToken() {
-  const result = await msalInstance.acquireTokenSilent({ scopes: ['Sites.ReadWrite.All'], account: msalInstance.getActiveAccount() });
-  accessToken = result.accessToken;
+  let account = msalInstance.getActiveAccount() || msalInstance.getAllAccounts()[0];
+  if (!account) throw new Error('No account available');
+  msalInstance.setActiveAccount(account);
+  try {
+    const result = await msalInstance.acquireTokenSilent({ scopes: ['Sites.ReadWrite.All', 'User.Read'], account });
+    accessToken = result.accessToken;
+  } catch(e) {
+    // Silent failed - try popup
+    const result = await msalInstance.acquireTokenPopup({ scopes: ['Sites.ReadWrite.All', 'User.Read'], account });
+    accessToken = result.accessToken;
+  }
 }
 
 async function callGraph(method, endpoint, body) {
@@ -847,12 +856,21 @@ function doMsalLogin() {
       document.getElementById('user-name-display').textContent = resp.account.name?.split(' ')[0] || resp.account.username;
       document.getElementById('user-avatar').textContent = (resp.account.name||resp.account.username).slice(0,2).toUpperCase();
       document.getElementById('demo-notice').style.display = 'none';
-      await getToken();
-      await getSiteId();
-      await ensureLists();
-      await loadAll();
+      try {
+        await getToken();
+        await getSiteId();
+        await ensureLists();
+        showApp();
+        await loadAll();
+      } catch(e) {
+        console.error('Fejl efter login:', e);
+        showToast('Fejl ved indlæsning: ' + e.message, 'error');
+      }
     })
-    .catch(e => console.error('Login fejlede:', e));
+    .catch(e => {
+      console.error('Login fejlede:', e);
+      showToast('Login fejlede: ' + e.message, 'error');
+    });
 }
 
 function doLogout() {
