@@ -467,7 +467,7 @@ tbody tr:hover td { background: var(--bg); }
         <div class="avatar" id="user-avatar">–</div>
         <span id="user-name-display">–</span>
       </div>
-      <button class="btn btn-sm btn-ghost" id="login-logout-btn" onclick="currentUser ? doLogout() : doMsalLogin()">Log ind</button>
+      <button class="btn btn-sm btn-ghost" id="login-logout-btn" onclick="doMsalLogin()">Log ind</button>
     </div>
   </header>
 
@@ -705,13 +705,13 @@ async function initMsal() {
     await msalInstance.initialize();
 
     // Try to get account from cache
-    let account = msalInstance.getAllAccounts()[0];
+    let account = msalInstance.getAllAccounts().find(a => a.username?.includes('@addvision.dk')) || msalInstance.getAllAccounts()[0];
     if (!account) {
       // No cached account - try silent SSO with hint from tenant
       try {
         const silentResp = await msalInstance.ssoSilent({
           scopes: ['Sites.ReadWrite.All', 'User.Read'],
-          loginHint: undefined
+          domain_hint: 'addvision.dk'
         });
         account = silentResp.account;
         msalInstance.setActiveAccount(account);
@@ -853,7 +853,22 @@ function saveConfig() {
 
 function doMsalLogin() {
   if (!msalInstance) { location.reload(); return; }
-  msalInstance.loginPopup({ scopes: ['Sites.ReadWrite.All', 'User.Read'] })
+  // If already logged in, load data
+  const existingAccount = msalInstance.getAllAccounts().find(a => a.username?.includes('@addvision.dk'));
+  if (existingAccount) {
+    msalInstance.setActiveAccount(existingAccount);
+    currentUser = { name: existingAccount.name, email: existingAccount.username, role: 'admin' };
+    document.getElementById('user-name-display').textContent = existingAccount.name?.split(' ')[0] || existingAccount.username;
+    document.getElementById('user-avatar').textContent = (existingAccount.name||existingAccount.username).slice(0,2).toUpperCase();
+    const llb = document.getElementById('login-logout-btn'); if(llb) llb.textContent = 'Log ud'; if(llb) llb.setAttribute('onclick','doLogout()');
+    accessToken = null;
+    getToken().then(() => { getSiteId(); }).then(() => { ensureLists(); }).then(() => { showApp(); loadAll(); });
+    return;
+  }
+  msalInstance.loginPopup({ 
+    scopes: ['Sites.ReadWrite.All', 'User.Read'],
+    domain_hint: 'addvision.dk'
+  })
     .then(async (resp) => {
       msalInstance.setActiveAccount(resp.account);
       currentUser = { name: resp.account.name, email: resp.account.username, role: 'admin' };
@@ -871,8 +886,11 @@ function doMsalLogin() {
 }
 
 function doLogout() {
-  if (APP_CONFIG.demoMode) { location.reload(); return; }
-  if (msalInstance) msalInstance.logoutRedirect();
+  if (msalInstance) {
+    msalInstance.logoutPopup().then(() => { location.reload(); });
+  } else {
+    location.reload();
+  }
 }
 
 function showApp() {
