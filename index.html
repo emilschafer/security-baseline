@@ -981,16 +981,7 @@ async function doReviewLogin() {
     await reviewMsalInstance.initialize();
 
     const resp = await reviewMsalInstance.loginPopup({
-      scopes: ['https://graph.microsoft.com/Directory.Read.All',
-               'https://graph.microsoft.com/Policy.Read.All',
-               'https://graph.microsoft.com/Organization.Read.All',
-               'https://graph.microsoft.com/User.Read.All',
-               'https://graph.microsoft.com/Group.Read.All',
-               'https://graph.microsoft.com/RoleManagement.Read.Directory',
-               'https://graph.microsoft.com/SecurityEvents.Read.All',
-               'https://graph.microsoft.com/SharePointTenantSettings.Read.All',
-               'https://graph.microsoft.com/TeamSettings.Read.All',
-               'https://graph.microsoft.com/ChannelSettings.Read.All'],
+      scopes: ['https://graph.microsoft.com/.default'],
       prompt: 'select_account'
     });
 
@@ -1099,7 +1090,12 @@ async function runAutomatedReview() {
         detail = pass ? 'Admin-konti har ingen user licenser' : `${licensedCount} admin-konti har licenser tildelt`;
       }
       else if (c.check_id === '1.2.1') {
-        const groups = await callReviewGraph(`/groups?$filter=visibility eq 'Public'&$select=displayName&$top=10`);
+        const groups = await (async () => {
+        const r = await fetch('https://graph.microsoft.com/v1.0/groups?$filter=visibility eq \'Public\'&$select=displayName&$top=100&$count=true', {
+          headers: { 'Authorization': `Bearer ${reviewToken}`, 'ConsistencyLevel': 'eventual' }
+        });
+        return r.ok ? r.json() : { value: [] };
+      })();
         const count = groups?.value?.length || 0;
         pass = count === 0;
         detail = count === 0 ? 'Ingen offentlige grupper' : `${count} offentlige grupper fundet`;
@@ -1153,7 +1149,7 @@ async function runAutomatedReview() {
 
       // ── Section 2: Microsoft Defender ──────────────────────────────────
       else if (c.check_id === '2.1.1') {
-        const links = await callReviewGraph('/security/safeLinksForOffice365?$top=1').catch(() => null);
+        const links = await callReviewGraph('/security/attackSimulation/operations?$top=1').catch(() => null);
         detail = 'Verificer Safe Links i Defender portal > Email & collaboration > Policies';
         pass = null;
       }
@@ -1210,7 +1206,11 @@ async function runAutomatedReview() {
       }
       else if (c.check_id === '5.1.2.5') {
         // Stay signed in option hidden
-        const branding = await callReviewGraph('/organization/' + (orgData?.value?.[0]?.id || '') + '/branding').catch(() => null);
+        const branding = await (async () => {
+        const orgResp = await callReviewGraph('/organization?$select=id');
+        const orgId = orgResp?.value?.[0]?.id;
+        return orgId ? callReviewGraph('/organization/' + orgId + '/branding') : null;
+      })().catch(() => null);
         pass = branding?.hideKeepMeSignedIn === true;
         detail = pass ? '"Stay signed in" er skjult' : '"Stay signed in" er synlig';
       }
@@ -1414,12 +1414,12 @@ async function runAutomatedReview() {
         detail = 'Verificer SSPR indstillinger i Entra > Password reset';
       }
       else if (c.check_id === '5.3.1') {
-        const eligibleAssignments = await callReviewGraph('/roleManagement/directory/roleEligibilitySchedules?$top=5').catch(() => null);
+        const eligibleAssignments = await callReviewGraphBeta('/roleManagement/directory/roleEligibilityScheduleInstances?$top=5').catch(() => null);
         pass = eligibleAssignments !== null;
         detail = eligibleAssignments ? 'PIM eligible assignments fundet - verificer at admins bruger aktivering' : 'Ingen PIM eligible assignments - roller muligvis permanent assigned';
       }
       else if (c.check_id === '5.3.2' || c.check_id === '5.3.3') {
-        const reviews = await callReviewGraph('/identityGovernance/accessReviews/definitions?$top=5').catch(() => null);
+        const reviews = await callReviewGraphBeta('/identityGovernance/accessReviews/definitions?$top=5').catch(() => null);
         pass = (reviews?.value?.length || 0) > 0;
         detail = pass ? `${reviews.value.length} access reviews konfigureret` : 'Ingen access reviews fundet';
       }
@@ -1499,12 +1499,12 @@ async function runAutomatedReview() {
         detail = 'Verificer ekstern fildeling i Teams admin center > Files';
       }
       else if (c.check_id === '8.1.2') {
-        const msgPolicy = await callReviewGraphBeta('/teamwork/teamsMessagingPolicies/global');
+        const msgPolicy = await callReviewGraphBeta('/teams/messagingPolicies/global');
         pass = null;
         detail = 'Verificer email til kanal indstilling i Teams admin center';
       }
       else if (c.check_id === '8.2.1') {
-        const fedConfig = await callReviewGraphBeta('/policies/teamsFederationConfiguration');
+        const fedConfig = await callReviewGraphBeta('/teamwork/teamsExternalAccessConfiguration');
         pass = null;
         detail = 'Verificer ekstern adgang i Teams admin center > External access';
       }
@@ -1521,69 +1521,68 @@ async function runAutomatedReview() {
         detail = 'Verificer trial tenant kommunikation i Teams admin center';
       }
       else if (c.check_id === '8.4.1') {
-        const appPolicy = await callReviewGraphBeta('/teamwork/teamsAppPermissionPolicies/global');
+        const appPolicy = await callReviewGraphBeta('/teams/appPermissionPolicies/global');
         pass = null;
         detail = 'Verificer app tilladelsespolitikker i Teams admin center > Teams apps';
       }
       else if (c.check_id === '8.5.1') {
-        const meetingPolicy = await callReviewGraph('/teams/teamwork/online-meetings/defaults').catch(() => callReviewGraphBeta('/teamwork/teamsMeetingPolicies/global')).catch(() => null);
+        const meetingPolicy = await callReviewGraphBeta('/teamwork/teamsMeetingPolicies/global').catch(() => null);
         pass = meetingPolicy?.allowAnonymousUsersToJoinMeeting === false;
         detail = pass ? 'Anonyme brugere kan ikke deltage i møder' : 'Anonyme brugere KAN deltage i møder';
       }
       else if (c.check_id === '8.5.2') {
-        const meetingPolicy = await callReviewGraph('/teams/teamwork/online-meetings/defaults').catch(() => callReviewGraphBeta('/teamwork/teamsMeetingPolicies/global')).catch(() => null);
+        const meetingPolicy = await callReviewGraphBeta('/teamwork/teamsMeetingPolicies/global').catch(() => null);
         pass = meetingPolicy?.allowAnonymousUsersToStartMeeting === false;
         detail = pass ? 'Anonyme brugere kan ikke starte møder' : 'Anonyme brugere KAN starte møder';
       }
       else if (c.check_id === '8.5.3') {
-        const meetingPolicy = await callReviewGraph('/teams/teamwork/online-meetings/defaults').catch(() => callReviewGraphBeta('/teamwork/teamsMeetingPolicies/global')).catch(() => null);
+        const meetingPolicy = await callReviewGraphBeta('/teamwork/teamsMeetingPolicies/global').catch(() => null);
         const lobby = meetingPolicy?.autoAdmittedUsers;
         pass = lobby === 'EveryoneInCompanyExcludingGuests' || lobby === 'InvitedUsers' || lobby === 'OrganizerOnly';
         detail = `Lobby indstilling: ${lobby || 'ukendt'}`;
       }
       else if (c.check_id === '8.5.4') {
-        const meetingPolicy = await callReviewGraph('/teams/teamwork/online-meetings/defaults').catch(() => callReviewGraphBeta('/teamwork/teamsMeetingPolicies/global')).catch(() => null);
+        const meetingPolicy = await callReviewGraphBeta('/teamwork/teamsMeetingPolicies/global').catch(() => null);
         pass = meetingPolicy?.allowPstnUsersToBypassLobby === false;
         detail = pass ? 'Dial-in kan ikke omgå lobby' : 'Dial-in KAN omgå lobby';
       }
       else if (c.check_id === '8.5.5') {
-        const meetingPolicy = await callReviewGraph('/teams/teamwork/online-meetings/defaults').catch(() => callReviewGraphBeta('/teamwork/teamsMeetingPolicies/global')).catch(() => null);
+        const meetingPolicy = await callReviewGraphBeta('/teamwork/teamsMeetingPolicies/global').catch(() => null);
         const chatType = meetingPolicy?.meetingChatEnabledType;
         pass = chatType === 'EnabledExceptAnonymous' || chatType === 'Disabled';
         detail = `Møde chat type: ${chatType || 'ukendt'}`;
       }
       else if (c.check_id === '8.5.6') {
-        const meetingPolicy = await callReviewGraph('/teams/teamwork/online-meetings/defaults').catch(() => callReviewGraphBeta('/teamwork/teamsMeetingPolicies/global')).catch(() => null);
+        const meetingPolicy = await callReviewGraphBeta('/teamwork/teamsMeetingPolicies/global').catch(() => null);
         const presenter = meetingPolicy?.designatedPresenterRoleMode;
         pass = presenter === 'OrganizerOnly' || presenter === 'OrganizerAndCoOrganizerOnly';
         detail = `Presenter rolle: ${presenter || 'ukendt'}`;
       }
       else if (c.check_id === '8.5.7') {
-        const meetingPolicy = await callReviewGraph('/teams/teamwork/online-meetings/defaults').catch(() => callReviewGraphBeta('/teamwork/teamsMeetingPolicies/global')).catch(() => null);
+        const meetingPolicy = await callReviewGraphBeta('/teamwork/teamsMeetingPolicies/global').catch(() => null);
         pass = meetingPolicy?.allowExternalParticipantGiveRequestControl === false;
         detail = pass ? 'Eksterne kan ikke give/anmode kontrol' : 'Eksterne KAN give/anmode kontrol';
       }
       else if (c.check_id === '8.5.8') {
-        const meetingPolicy = await callReviewGraph('/teams/teamwork/online-meetings/defaults').catch(() => callReviewGraphBeta('/teamwork/teamsMeetingPolicies/global')).catch(() => null);
+        const meetingPolicy = await callReviewGraphBeta('/teamwork/teamsMeetingPolicies/global').catch(() => null);
         pass = meetingPolicy?.allowExternalNonTrustedMeetingChat === false;
         detail = pass ? 'Ekstern møde chat deaktiveret' : 'Ekstern møde chat aktiveret';
       }
       else if (c.check_id === '8.5.9') {
-        const meetingPolicy = await callReviewGraph('/teams/teamwork/online-meetings/defaults').catch(() => callReviewGraphBeta('/teamwork/teamsMeetingPolicies/global')).catch(() => null);
+        const meetingPolicy = await callReviewGraphBeta('/teamwork/teamsMeetingPolicies/global').catch(() => null);
         pass = meetingPolicy?.allowCloudRecording === false;
         detail = pass ? 'Optagelse slået fra som standard' : 'Optagelse slået til som standard';
       }
       else if (c.check_id === '8.6.1') {
-        const msgPolicy = await callReviewGraphBeta('/teamwork/teamsMessagingPolicies/global').catch(() => null);
+        const msgPolicy = await callReviewGraphBeta('/teams/messagingPolicies/global').catch(() => null);
         pass = msgPolicy?.allowSecurityEndUserReporting === true;
         detail = pass ? 'Sikkerhedsrapportering aktiveret' : 'Sikkerhedsrapportering IKKE aktiveret';
       }
 
       // ── Section 9: Microsoft Fabric ────────────────────────────────────
       else if (c.check_id.startsWith('9.')) {
-        const fabricSettings = await fetch('https://api.powerbi.com/v1.0/myorg/admin/tenantSettings', {
-          headers: { 'Authorization': `Bearer ${reviewToken}` }
-        }).then(r => r.ok ? r.json() : null).catch(() => null);
+        // Power BI API requires separate token scope - try via Graph instead
+        const fabricSettings = await callReviewGraph('/admin/powerbi/tenantsettings').catch(() => null);
 
         const fabricChecks = {
           '9.1.1': { setting: 'AllowGuestLookup', inverse: true },
