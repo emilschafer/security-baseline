@@ -1044,6 +1044,13 @@ async function runAutomatedReview() {
   const total = checks.length;
   let current = 0;
 
+  // Pre-fetch Secure Score controls for Exchange/Defender checks
+  try {
+    const secureScoreResp = await callReviewGraph('/security/secureScoreControlProfiles?$top=200');
+    window._secureScoreControls = secureScoreResp?.value || [];
+    console.log(`Secure Score: ${window._secureScoreControls.length} controls loaded`);
+  } catch(e) { window._secureScoreControls = []; }
+
   // Pre-fetch commonly needed data
   const [orgData, authPolicy, spSettings, teamsConfig] = await Promise.all([
     callReviewGraph('/organization?$select=passwordPolicies,verifiedDomains'),
@@ -1151,22 +1158,52 @@ async function runAutomatedReview() {
       }
 
       // ── Section 2: Microsoft Defender ──────────────────────────────────
-      else if (c.check_id === '2.1.1') {
-        const links = await callReviewGraph('/security/attackSimulation/operations?$top=1').catch(() => null);
-        detail = 'Verificer Safe Links i Defender portal > Email & collaboration > Policies';
-        pass = null;
-      }
-      else if (c.check_id.startsWith('2.1.') || c.check_id.startsWith('2.2.') || c.check_id.startsWith('2.4.')) {
-        detail = 'Kræver Exchange Online PowerShell eller Defender portal';
-        pass = null;
+      else if (c.check_id.startsWith('2.')) {
+        const defenderMap = {
+          '2.1.1': { id: 'EnableSafeLinksPolicies', name: 'Safe Links' },
+          '2.1.2': { id: 'EnableMalwareFilterPolicies', name: 'Attachment filter' },
+          '2.1.3': { id: 'EnableMalwareFilterPolicies', name: 'Malware notifications' },
+          '2.1.4': { id: 'EnableSafeAttachmentsPolicies', name: 'Safe Attachments' },
+          '2.1.5': { id: 'EnableSafeAttachmentsForSPODB', name: 'Safe Attachments SPO' },
+          '2.1.6': { id: 'SetOutboundSpamNotifications', name: 'Spam notifications' },
+          '2.1.7': { id: 'EnableAntiPhishingPolicies', name: 'Anti-phishing' },
+          '2.1.8': { id: 'EnableDomainRegistration', name: 'SPF records' },
+          '2.1.9': { id: 'EnableDKIM', name: 'DKIM' },
+          '2.1.10': { id: 'EnableDMARC', name: 'DMARC' },
+          '2.1.11': { id: 'EnableMalwareFilterPolicies', name: 'Attachment filtering' },
+          '2.1.12': { id: 'DisableAnonymousSafeListIPSettings', name: 'IP allow list' },
+          '2.1.13': { id: 'DisableAnonymousSafeListIPSettings', name: 'Safe list' },
+          '2.1.14': { id: 'DisableBypassSpamFiltering', name: 'Allowed domains' },
+          '2.1.15': { id: 'SetOutboundSpamNotifications', name: 'Outbound limits' },
+          '2.2.1': { id: 'EnableAuditDataRetention', name: 'Emergency monitoring' },
+          '2.4.1': { id: 'EnableAdvancedThreatProtectionForSharePoint', name: 'Priority protection' },
+          '2.4.2': { id: 'EnableSafeAttachmentsPolicies', name: 'Strict protection' },
+          '2.4.3': { id: 'IntegrateSecuritySolutionsInMicrosoftDefender', name: 'Defender for Cloud Apps' },
+          '2.4.4': { id: 'TurnOnATPSafeAttachmentsforTeams', name: 'ZAP for Teams' },
+          '2.4.5': { id: 'EnableAutoIR', name: 'AIR remediation' },
+        };
+        const cfg = defenderMap[c.check_id];
+        if (cfg && window._secureScoreControls?.length > 0) {
+          const control = window._secureScoreControls.find(sc => sc.id === cfg.id);
+          if (control) {
+            const implementedPoints = control.controlStateUpdates?.find(u => u.state === 'thirdParty') ? control.maxScore : 0;
+            pass = null; // Secure Score shows capability, not exact config
+            detail = `${cfg.name} - Secure Score kontrol: "${control.title}" (max ${control.maxScore} pts) - verificer i Defender portal`;
+          } else {
+            pass = null;
+            detail = `Verificer ${cfg.name} i Microsoft Defender portal`;
+          }
+        } else {
+          pass = null;
+          detail = `Verificer i Microsoft Defender portal > Email & collaboration > Policies`;
+        }
       }
 
       // ── Section 3: Microsoft Purview ───────────────────────────────────
       else if (c.check_id === '3.1.1') {
         // Check unified audit log via Graph Security API
-        const auditStatus = await callReviewGraphBeta('/security/auditLog/queries').catch(() => null);
-        pass = auditStatus !== null; // If we can query it, it's enabled
-        detail = pass ? 'Audit log tilgængeligt' : 'Audit log muligvis ikke aktiveret - verificer i Purview';
+        pass = null;
+        detail = 'Verificer audit log status i Microsoft Purview > Audit > Search';
       }
       else if (c.check_id.startsWith('3.')) {
         detail = 'Verificer i Microsoft Purview compliance portal';
@@ -1372,9 +1409,8 @@ async function runAutomatedReview() {
         pass = null;
       }
       else if (c.check_id === '5.2.3.4') {
-        const mfaReport = await callReviewGraphBeta('/reports/credentialUserRegistrationDetails?$top=1').catch(() => null);
-        pass = mfaReport !== null;
-        detail = mfaReport ? 'MFA registrering data tilgængeligt - verificer at alle er MFA capable' : 'Kræver Reports.Read.All permission';
+        pass = null;
+        detail = 'Verificer MFA registrering i Entra > Users > Per-user MFA eller MFA registration report';
       }
       else if (c.check_id === '5.2.3.5') {
         const authMethods = await callReviewGraph('/policies/authenticationMethodsPolicy');
@@ -1417,9 +1453,8 @@ async function runAutomatedReview() {
         detail = 'Verificer SSPR indstillinger i Entra > Password reset';
       }
       else if (c.check_id === '5.3.1') {
-        const eligibleAssignments = await callReviewGraph('/roleManagement/directory/roleEligibilitySchedules?$select=id,status&$top=5').catch(() => null);
-        pass = eligibleAssignments !== null;
-        detail = eligibleAssignments ? 'PIM eligible assignments fundet - verificer at admins bruger aktivering' : 'Ingen PIM eligible assignments - roller muligvis permanent assigned';
+        pass = null;
+        detail = 'Verificer PIM eligible assignments i Entra > PIM > Microsoft Entra Roles > Eligible assignments';
       }
       else if (c.check_id === '5.3.2' || c.check_id === '5.3.3') {
         pass = null;
@@ -1495,93 +1530,32 @@ async function runAutomatedReview() {
       }
 
       // ── Section 8: Microsoft Teams ─────────────────────────────────────
-      else if (c.check_id === '8.1.1') {
-        const teamsSettings = await callReviewGraphBeta('/teamwork/teamsAppSettings').catch(() => null);
+      else if (c.check_id.startsWith('8.')) {
+        // Teams policies kræver Teams PowerShell - markeres som manuelle
+        const teamsManualChecks = {
+          '8.1.1': 'Verificer ekstern fildeling i Teams admin center > Teams apps > Files',
+          '8.1.2': 'Verificer "Email to channel" i Teams admin center > Org-wide settings > External access',
+          '8.2.1': 'Verificer ekstern adgang i Teams admin center > External access',
+          '8.2.2': 'Verificer unmanaged Teams brugere i Teams admin center > External access > Teams accounts',
+          '8.2.3': 'Verificer Teams consumer i Teams admin center > External access',
+          '8.2.4': 'Verificer trial tenant i Teams admin center > External access',
+          '8.4.1': 'Verificer app tilladelsespolitikker i Teams admin center > Teams apps > Permission policies',
+          '8.5.1': 'Verificer anonym deltagelse i Teams admin center > Meetings > Meeting policies',
+          '8.5.2': 'Verificer anonym start i Teams admin center > Meetings > Meeting policies',
+          '8.5.3': 'Verificer lobby indstilling i Teams admin center > Meetings > Meeting policies',
+          '8.5.4': 'Verificer dial-in lobby i Teams admin center > Meetings > Meeting policies',
+          '8.5.5': 'Verificer møde chat i Teams admin center > Meetings > Meeting policies',
+          '8.5.6': 'Verificer presenter rolle i Teams admin center > Meetings > Meeting policies',
+          '8.5.7': 'Verificer ekstern kontrol i Teams admin center > Meetings > Meeting policies',
+          '8.5.8': 'Verificer ekstern møde chat i Teams admin center > Meetings > Meeting policies',
+          '8.5.9': 'Verificer optagelse i Teams admin center > Meetings > Meeting policies',
+          '8.6.1': 'Verificer sikkerhedsrapportering i Teams admin center > Messaging policies',
+        };
         pass = null;
-        detail = 'Verificer ekstern fildeling i Teams admin center > Files';
-      }
-      else if (c.check_id === '8.1.2') {
-        const msgPolicy = await callReviewGraphBeta('/teamwork/teamsMessagingSettings');
-        pass = null;
-        detail = 'Verificer email til kanal indstilling i Teams admin center';
-      }
-      else if (c.check_id === '8.2.1') {
-        const fedConfig = await callReviewGraphBeta('/teamwork/teamsExternalAccess');
-        pass = null;
-        detail = 'Verificer ekstern adgang i Teams admin center > External access';
-      }
-      else if (c.check_id === '8.2.2') {
-        pass = null;
-        detail = 'Verificer umanaged Teams brugere i Teams admin center > External access';
-      }
-      else if (c.check_id === '8.2.3') {
-        pass = null;
-        detail = 'Verificer Teams consumer i Teams admin center > External access';
-      }
-      else if (c.check_id === '8.2.4') {
-        pass = null;
-        detail = 'Verificer trial tenant kommunikation i Teams admin center';
-      }
-      else if (c.check_id === '8.4.1') {
-        const appPolicy = await callReviewGraphBeta('/teamwork/teamsAppSettings');
-        pass = null;
-        detail = 'Verificer app tilladelsespolitikker i Teams admin center > Teams apps';
-      }
-      else if (c.check_id === '8.5.1') {
-        const meetingPolicy = await callReviewGraphBeta('/teams/meetingSettings').catch(() => null);
-        pass = meetingPolicy?.allowAnonymousUsersToJoinMeeting === false;
-        detail = pass ? 'Anonyme brugere kan ikke deltage i møder' : 'Anonyme brugere KAN deltage i møder';
-      }
-      else if (c.check_id === '8.5.2') {
-        const meetingPolicy = await callReviewGraphBeta('/teams/meetingSettings').catch(() => null);
-        pass = meetingPolicy?.allowAnonymousUsersToStartMeeting === false;
-        detail = pass ? 'Anonyme brugere kan ikke starte møder' : 'Anonyme brugere KAN starte møder';
-      }
-      else if (c.check_id === '8.5.3') {
-        const meetingPolicy = await callReviewGraphBeta('/teams/meetingSettings').catch(() => null);
-        const lobby = meetingPolicy?.autoAdmittedUsers;
-        pass = lobby === 'EveryoneInCompanyExcludingGuests' || lobby === 'InvitedUsers' || lobby === 'OrganizerOnly';
-        detail = `Lobby indstilling: ${lobby || 'ukendt'}`;
-      }
-      else if (c.check_id === '8.5.4') {
-        const meetingPolicy = await callReviewGraphBeta('/teams/meetingSettings').catch(() => null);
-        pass = meetingPolicy?.allowPstnUsersToBypassLobby === false;
-        detail = pass ? 'Dial-in kan ikke omgå lobby' : 'Dial-in KAN omgå lobby';
-      }
-      else if (c.check_id === '8.5.5') {
-        const meetingPolicy = await callReviewGraphBeta('/teams/meetingSettings').catch(() => null);
-        const chatType = meetingPolicy?.meetingChatEnabledType;
-        pass = chatType === 'EnabledExceptAnonymous' || chatType === 'Disabled';
-        detail = `Møde chat type: ${chatType || 'ukendt'}`;
-      }
-      else if (c.check_id === '8.5.6') {
-        const meetingPolicy = await callReviewGraphBeta('/teams/meetingSettings').catch(() => null);
-        const presenter = meetingPolicy?.designatedPresenterRoleMode;
-        pass = presenter === 'OrganizerOnly' || presenter === 'OrganizerAndCoOrganizerOnly';
-        detail = `Presenter rolle: ${presenter || 'ukendt'}`;
-      }
-      else if (c.check_id === '8.5.7') {
-        const meetingPolicy = await callReviewGraphBeta('/teams/meetingSettings').catch(() => null);
-        pass = meetingPolicy?.allowExternalParticipantGiveRequestControl === false;
-        detail = pass ? 'Eksterne kan ikke give/anmode kontrol' : 'Eksterne KAN give/anmode kontrol';
-      }
-      else if (c.check_id === '8.5.8') {
-        const meetingPolicy = await callReviewGraphBeta('/teams/meetingSettings').catch(() => null);
-        pass = meetingPolicy?.allowExternalNonTrustedMeetingChat === false;
-        detail = pass ? 'Ekstern møde chat deaktiveret' : 'Ekstern møde chat aktiveret';
-      }
-      else if (c.check_id === '8.5.9') {
-        const meetingPolicy = await callReviewGraphBeta('/teams/meetingSettings').catch(() => null);
-        pass = meetingPolicy?.allowCloudRecording === false;
-        detail = pass ? 'Optagelse slået fra som standard' : 'Optagelse slået til som standard';
-      }
-      else if (c.check_id === '8.6.1') {
-        const msgPolicy = await callReviewGraphBeta('/teamwork/teamsMessagingSettings').catch(() => null);
-        pass = msgPolicy?.allowSecurityEndUserReporting === true;
-        detail = pass ? 'Sikkerhedsrapportering aktiveret' : 'Sikkerhedsrapportering IKKE aktiveret';
+        detail = teamsManualChecks[c.check_id] || 'Verificer i Teams admin center';
       }
 
-      // ── Section 9: Microsoft Fabric ────────────────────────────────────
+// ── Section 9: Microsoft Fabric ────────────────────────────────────
       else if (c.check_id.startsWith('9.')) {
         // Power BI API requires separate token scope - try via Graph instead
         const fabricSettings = null; // Power BI Admin API not available via Graph
