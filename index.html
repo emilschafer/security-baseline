@@ -1409,7 +1409,7 @@ function setFilter(f, btn) {
 function filteredChecks() {
   return checks.filter(c => {
     if (currentFilter === 'all') return true;
-    return (assessments[c.spId]?.status || 'none') === currentFilter;
+    return ((assessments[c.check_id] || assessments[c.spId] || {})?.status || 'none') === currentFilter;
   });
 }
 
@@ -1538,7 +1538,7 @@ function updateProgress() {
     document.getElementById('prog-fill').style.width = '0%';
     return;
   }
-  const done = checks.filter(c => assessments[c.spId]?.status && assessments[c.spId].status !== 'none').length;
+  const done = checks.filter(c => (assessments[c.check_id]?.status && assessments[c.check_id].status !== 'none') || ((assessments[c.check_id] || assessments[c.spId])?.status && (assessments[c.check_id] || assessments[c.spId])?.status !== 'none')).length;
   const pct = Math.round(done/checks.length*100);
   document.getElementById('prog-label').textContent = `${done} / ${checks.length} (${pct}%)`;
   document.getElementById('prog-fill').style.width = pct+'%';
@@ -1602,7 +1602,7 @@ async function generatePDFWithMeta(score, noteConstraints, noteNext) {
     doc.setTextColor(191,206,247);
     doc.text(`Kunde: ${selectedCustomer.name}`, ml, 26);
     doc.text(`Genereret: ${new Date().toLocaleDateString('da-DK',{day:'2-digit',month:'long',year:'numeric'})} · CIS M365 v7.0.0`, ml, 32);
-    const done = checks.filter(c=>assessments[c.spId]?.status&&assessments[c.spId].status!=='none').length;
+    const done = checks.filter(c=>(assessments[c.check_id] || assessments[c.spId])?.status && (assessments[c.check_id] || assessments[c.spId])?.status!=='none').length;
     const pct = checks.length ? Math.round(done/checks.length*100) : 0;
     doc.setFillColor(224,231,255); doc.rect(ml,37,cw,3,'F');
     doc.setFillColor(255,255,255); doc.rect(ml,37,cw*(pct/100),3,'F');
@@ -1614,7 +1614,7 @@ async function generatePDFWithMeta(score, noteConstraints, noteNext) {
     doc.setFillColor(248,249,251); doc.rect(0,y-2,pw,46,'F');
     doc.setDrawColor(229,231,235); doc.line(0,y+44,pw,y+44);
     const counts = {implemented:0,review:0,accepted:0,declined:0,none:0};
-    checks.forEach(c=>{const s=assessments[c.spId]?.status||'none';counts[s]++;});
+    checks.forEach(c=>{const s=((assessments[c.check_id] || assessments[c.spId]) || {}).status||'none';counts[s]++;});
 
     doc.setFontSize(8); doc.setFont('helvetica','bold'); doc.setTextColor(107,114,128);
     doc.text('SAMLET STATUS', ml, y+4);
@@ -1686,7 +1686,7 @@ async function generatePDFWithMeta(score, noteConstraints, noteNext) {
       doc.setFontSize(9);doc.setFont('helvetica','bold');doc.setTextColor(107,114,128);
       doc.text(secName.toUpperCase(),ml,y+6); y+=11;
       for(const c of secChecks) {
-        const a=assessments[c.spId];
+        const a=(assessments[c.check_id] || assessments[c.spId] || {});
         const status=a?.status||'none';
         const color=statusColors[status];
         const comment=a?.comment||'';
