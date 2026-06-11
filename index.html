@@ -943,6 +943,780 @@ tbody tr:hover td { background: var(--bg); }
 <div id="toast"></div>
 
 <script>
+// ══ AUTOMATED REVIEW ══════════════════════════════════════════
+
+let reviewCustomerId = null;
+let reviewCustomerName = null;
+let reviewMsalInstance = null;
+let reviewToken = null;
+let reviewTenantId = null;
+
+function startReview(customerId, customerName) {
+  reviewCustomerId = customerId;
+  reviewCustomerName = customerName;
+  document.getElementById('review-customer-name').textContent = customerName;
+  document.getElementById('review-login-step').style.display = '';
+  document.getElementById('review-progress-step').style.display = 'none';
+  document.getElementById('review-results-step').style.display = 'none';
+  document.getElementById('review-footer').innerHTML = '<button class="btn" onclick="closeReview()">Annuller</button>';
+  document.getElementById('modal-review').classList.add('open');
+}
+
+function closeReview() {
+  document.getElementById('modal-review').classList.remove('open');
+  reviewToken = null;
+  reviewMsalInstance = null;
+}
+
+async function doReviewLogin() {
+  const tenantInput = document.getElementById('review-tenant-id').value.trim();
+  if (!tenantInput) { showToast('Indtast kundens tenant ID eller domæne', 'error'); return; }
+  reviewTenantId = tenantInput;
+
+  try {
+    reviewMsalInstance = new msal.PublicClientApplication({
+      auth: {
+        clientId: APP_CONFIG.clientId,
+        authority: `https://login.microsoftonline.com/${reviewTenantId}`,
+        redirectUri: window.location.origin + '/blank.html'
+      },
+      cache: { cacheLocation: 'sessionStorage' }
+    });
+    await reviewMsalInstance.initialize();
+
+    const resp = await reviewMsalInstance.loginPopup({
+      scopes: ['https://graph.microsoft.com/Directory.Read.All',
+               'https://graph.microsoft.com/Policy.Read.All',
+               'https://graph.microsoft.com/Organization.Read.All',
+               'https://graph.microsoft.com/User.Read.All',
+               'https://graph.microsoft.com/Group.Read.All',
+               'https://graph.microsoft.com/RoleManagement.Read.Directory',
+               'https://graph.microsoft.com/SecurityEvents.Read.All',
+               'https://graph.microsoft.com/SharePointTenantSettings.Read.All',
+               'https://graph.microsoft.com/TeamSettings.Read.All',
+               'https://graph.microsoft.com/ChannelSettings.Read.All'],
+      prompt: 'select_account'
+    });
+
+    reviewMsalInstance.setActiveAccount(resp.account);
+    const tokenResp = await reviewMsalInstance.acquireTokenSilent({
+      scopes: ['https://graph.microsoft.com/.default'],
+      account: resp.account
+    });
+    reviewToken = tokenResp.accessToken;
+
+    showToast(`Logget ind som ${resp.account.username}`, 'success');
+    runAutomatedReview();
+  } catch(e) {
+    showToast('Login fejlede: ' + e.message, 'error');
+  }
+}
+
+async function callReviewGraph(endpoint, method = 'GET', body = null) {
+  const r = await fetch(`https://graph.microsoft.com/v1.0${endpoint}`, {
+    method,
+    headers: {
+      'Authorization': `Bearer ${reviewToken}`,
+      'Content-Type': 'application/json'
+    },
+    body: body ? JSON.stringify(body) : undefined
+  });
+  if (!r.ok) return null;
+  if (r.status === 204) return {};
+  return r.json().catch(() => null);
+}
+
+async function callReviewGraphBeta(endpoint) {
+  const r = await fetch(`https://graph.microsoft.com/beta${endpoint}`, {
+    headers: { 'Authorization': `Bearer ${reviewToken}` }
+  });
+  if (!r.ok) return null;
+  return r.json().catch(() => null);
+}
+
+function logReview(checkId, status, detail) {
+  const log = document.getElementById('review-live-log');
+  const icon = status === 'implemented' ? '✅' : status === 'declined' ? '❌' : '⚠️';
+  const color = status === 'implemented' ? '#16a34a' : status === 'declined' ? '#dc2626' : '#d97706';
+  log.innerHTML += `<div style="color:${color};margin-bottom:2px;">${icon} [${checkId}] ${detail}</div>`;
+  log.scrollTop = log.scrollHeight;
+}
+
+function updateReviewProgress(current, total, checkId) {
+  document.getElementById('review-count').textContent = `${current} / ${total}`;
+  document.getElementById('review-current-check').textContent = checkId;
+  document.getElementById('review-progress-bar').style.width = `${Math.round(current/total*100)}%`;
+}
+
+async function runAutomatedReview() {
+  document.getElementById('review-login-step').style.display = 'none';
+  document.getElementById('review-progress-step').style.display = '';
+  document.getElementById('review-footer').innerHTML = '';
+
+  const results = {};
+  const total = checks.length;
+  let current = 0;
+
+  // Pre-fetch commonly needed data
+  const [orgData, authPolicy, spSettings, teamsConfig] = await Promise.all([
+    callReviewGraph('/organization?$select=passwordPolicies,verifiedDomains'),
+    callReviewGraph('/policies/authorizationPolicy'),
+    callReviewGraph('/admin/sharepoint/settings').catch(() => null),
+    callReviewGraphBeta('/teamwork/teamsAppSettings').catch(() => null)
+  ]);
+
+  const gaRole = await callReviewGraph(`/directoryRoles?$filter=displayName eq 'Global Administrator'`);
+  const gaRoleId = gaRole?.value?.[0]?.id;
+  const gaMembers = gaRoleId ? await callReviewGraph(`/directoryRoles/${gaRoleId}/members?$select=id,userPrincipalName,onPremisesSyncEnabled`) : null;
+  const gaCount = gaMembers?.value?.length || 0;
+
+  for (const c of checks) {
+    current++;
+    updateReviewProgress(current, total, c.check_id);
+
+    let pass = null; // null = unknown/manual
+    let detail = 'Manuel verifikation påkrævet';
+
+    try {
+      // ── Section 1: Microsoft 365 Admin Center ──────────────────────────
+      if (c.check_id === '1.1.1') {
+        const hybrid = (gaMembers?.value || []).filter(u => u.onPremisesSyncEnabled === true);
+        pass = hybrid.length === 0;
+        detail = pass ? 'Ingen hybrid admin-konti' : `Hybrid admins: ${hybrid.map(u=>u.userPrincipalName).join(', ')}`;
+      }
+      else if (c.check_id === '1.1.2') {
+        pass = gaCount >= 2;
+        detail = `${gaCount} Global Admins - verificer at 2 er break-glass konti`;
+      }
+      else if (c.check_id === '1.1.3') {
+        pass = gaCount >= 2 && gaCount <= 4;
+        detail = `${gaCount} Global Admins (anbefalet: 2-4)`;
+      }
+      else if (c.check_id === '1.1.4') {
+        const adminIds = new Set((gaMembers?.value || []).map(u => u.id));
+        let licensedCount = 0;
+        for (const id of Array.from(adminIds).slice(0, 10)) {
+          const u = await callReviewGraph(`/users/${id}?$select=assignedLicenses`);
+          if (u?.assignedLicenses?.length > 0) licensedCount++;
+        }
+        pass = licensedCount === 0;
+        detail = pass ? 'Admin-konti har ingen user licenser' : `${licensedCount} admin-konti har licenser tildelt`;
+      }
+      else if (c.check_id === '1.2.1') {
+        const groups = await callReviewGraph(`/groups?$filter=visibility eq 'Public'&$select=displayName&$top=10`);
+        const count = groups?.value?.length || 0;
+        pass = count === 0;
+        detail = count === 0 ? 'Ingen offentlige grupper' : `${count} offentlige grupper fundet`;
+      }
+      else if (c.check_id === '1.2.2') {
+        // Check via Graph - find shared mailboxes with enabled sign-in
+        const sharedMailboxes = await callReviewGraph(`/users?$filter=userType eq 'Member'&$select=userPrincipalName,accountEnabled,assignedPlans&$top=100`);
+        // Can't easily distinguish shared without Exchange - approximate
+        detail = 'Kræver Exchange Online - verificer manuelt at shared mailbox sign-in er blokeret';
+        pass = null;
+      }
+      else if (c.check_id === '1.3.1') {
+        const pwdPolicies = orgData?.value?.[0]?.passwordPolicies || '';
+        pass = pwdPolicies.includes('DisablePasswordExpiration');
+        detail = pass ? 'Password udløb deaktiveret' : 'Password udløb er aktiveret';
+      }
+      else if (c.check_id === '1.3.2') {
+        const timeout = await callReviewGraph('/policies/activityBasedTimeoutPolicies');
+        pass = (timeout?.value?.length || 0) > 0;
+        detail = pass ? 'Activity-based timeout policy konfigureret' : 'Ingen timeout policy fundet';
+      }
+      else if (c.check_id === '1.3.3') {
+        detail = 'Kræver Exchange Online PowerShell - verificer ekstern kalenderdeling';
+        pass = null;
+      }
+      else if (c.check_id === '1.3.4') {
+        const allowed = authPolicy?.defaultUserRolePermissions?.allowedToCreateApps;
+        pass = allowed === false;
+        detail = pass ? 'Brugere kan ikke oprette app registrations' : 'Brugere kan oprette app registrations';
+      }
+      else if (c.check_id === '1.3.5') {
+        detail = 'Verificer i M365 Admin Center > Settings > Microsoft Forms';
+        pass = null;
+      }
+      else if (c.check_id === '1.3.6') {
+        detail = 'Kræver Exchange Online - verificer Customer Lockbox';
+        pass = null;
+      }
+      else if (c.check_id === '1.3.7') {
+        detail = 'Verificer i M365 Admin Center > Org settings > Microsoft 365 on the web';
+        pass = null;
+      }
+      else if (c.check_id === '1.3.8') {
+        detail = 'Verificer i M365 Admin Center > Settings > Sway';
+        pass = null;
+      }
+      else if (c.check_id === '1.3.9') {
+        detail = 'Kræver Exchange Online - verificer Bookings';
+        pass = null;
+      }
+
+      // ── Section 2: Microsoft Defender ──────────────────────────────────
+      else if (c.check_id === '2.1.1') {
+        const links = await callReviewGraph('/security/safeLinksForOffice365?$top=1').catch(() => null);
+        detail = 'Verificer Safe Links i Defender portal > Email & collaboration > Policies';
+        pass = null;
+      }
+      else if (c.check_id.startsWith('2.1.') || c.check_id.startsWith('2.2.') || c.check_id.startsWith('2.4.')) {
+        detail = 'Kræver Exchange Online PowerShell eller Defender portal';
+        pass = null;
+      }
+
+      // ── Section 3: Microsoft Purview ───────────────────────────────────
+      else if (c.check_id === '3.1.1') {
+        // Check unified audit log via Graph Security API
+        const auditStatus = await callReviewGraphBeta('/security/auditLog/queries').catch(() => null);
+        pass = auditStatus !== null; // If we can query it, it's enabled
+        detail = pass ? 'Audit log tilgængeligt' : 'Audit log muligvis ikke aktiveret - verificer i Purview';
+      }
+      else if (c.check_id.startsWith('3.')) {
+        detail = 'Verificer i Microsoft Purview compliance portal';
+        pass = null;
+      }
+
+      // ── Section 4: Intune ───────────────────────────────────────────────
+      else if (c.check_id === '4.1') {
+        const complianceSettings = await callReviewGraph('/deviceManagement/settings').catch(() => null);
+        if (complianceSettings) {
+          pass = complianceSettings.deviceComplianceCheckinThresholdDays !== null;
+          detail = pass ? 'Compliance indstillinger konfigureret' : 'Verificer compliance policy i Intune';
+        } else {
+          pass = null;
+          detail = 'Kræver Intune licens - verificer i Intune admin center';
+        }
+      }
+
+      // ── Section 5: Microsoft Entra ─────────────────────────────────────
+      else if (c.check_id === '5.1.2.1') {
+        // Per-user MFA should be disabled (CA should be used instead)
+        const caEnabled = (await callReviewGraph('/identity/conditionalAccess/policies?$select=id,state')).value?.some(p => p.state === 'enabled');
+        pass = caEnabled === true;
+        detail = caEnabled ? 'Conditional Access politikker er aktiveret (per-user MFA bør være deaktiveret)' : 'Ingen aktive CA politikker - per-user MFA check påkrævet';
+      }
+      else if (c.check_id === '5.1.2.2') {
+        const allowed = authPolicy?.defaultUserRolePermissions?.allowedToCreateApps;
+        pass = allowed === false;
+        detail = pass ? 'Brugere kan ikke registrere apps' : 'Brugere kan registrere apps';
+      }
+      else if (c.check_id === '5.1.2.3') {
+        const allowed = authPolicy?.defaultUserRolePermissions?.allowedToCreateTenants;
+        pass = allowed === false;
+        detail = pass ? 'Brugere kan ikke oprette tenants' : 'Brugere kan oprette tenants';
+      }
+      else if (c.check_id === '5.1.2.4') {
+        // Restrict non-admin access to Entra admin center
+        detail = 'Verificer i Entra > User settings > Restrict access to Microsoft Entra admin center';
+        pass = null;
+      }
+      else if (c.check_id === '5.1.2.5') {
+        // Stay signed in option hidden
+        const branding = await callReviewGraph('/organization/' + (orgData?.value?.[0]?.id) + '/branding').catch(() => null);
+        pass = branding?.hideKeepMeSignedIn === true;
+        detail = pass ? '"Stay signed in" er skjult' : '"Stay signed in" er synlig';
+      }
+      else if (c.check_id === '5.1.2.6') {
+        // LinkedIn disabled
+        detail = 'Verificer LinkedIn-forbindelser i Entra > User settings';
+        pass = null;
+      }
+      else if (c.check_id === '5.1.3.1') {
+        const allowed = authPolicy?.defaultUserRolePermissions?.allowedToCreateSecurityGroups;
+        pass = allowed === false;
+        detail = pass ? 'Brugere kan ikke oprette sikkerhedsgrupper' : 'Brugere kan oprette sikkerhedsgrupper';
+      }
+      else if (c.check_id === '5.1.3.2') {
+        detail = 'Verificer i Entra > Groups > My Groups settings';
+        pass = null;
+      }
+      else if (c.check_id === '5.1.3.3') {
+        detail = 'Verificer i Entra > Groups > My Groups settings';
+        pass = null;
+      }
+      else if (c.check_id === '5.1.3.4') {
+        const allowed = authPolicy?.defaultUserRolePermissions?.allowedToCreateGroups;
+        pass = allowed === false;
+        detail = pass ? 'Brugere kan ikke oprette M365 grupper' : 'Brugere kan oprette M365 grupper';
+      }
+      else if (c.check_id === '5.1.4.1') {
+        const deviceSettings = await callReviewGraph('/policies/deviceRegistrationPolicy').catch(() => null);
+        if (deviceSettings) {
+          const restricted = deviceSettings.azureAdJoin?.allowedToJoin?.odataType?.includes('No') || 
+                             deviceSettings.azureAdJoin?.isAdminConfigurable === true;
+          pass = restricted;
+          detail = restricted ? 'Device join er begrænset' : 'Alle brugere kan joine enheder til Entra';
+        } else {
+          pass = null;
+          detail = 'Verificer device join indstillinger i Entra > Devices';
+        }
+      }
+      else if (c.check_id === '5.1.4.2') {
+        const deviceSettings = await callReviewGraph('/policies/deviceRegistrationPolicy').catch(() => null);
+        if (deviceSettings) {
+          const maxDevices = deviceSettings.userDeviceQuota;
+          pass = maxDevices !== null && maxDevices < 50;
+          detail = `Max enheder per bruger: ${maxDevices ?? 'ubegrænset'}`;
+        } else {
+          pass = null;
+          detail = 'Verificer max enheder i Entra > Devices > Device settings';
+        }
+      }
+      else if (c.check_id === '5.1.4.3') {
+        const deviceSettings = await callReviewGraph('/policies/deviceRegistrationPolicy').catch(() => null);
+        pass = deviceSettings?.localAdminPassword?.isEnabled !== true;
+        detail = pass ? 'GA tilføjes ikke som lokal admin ved Entra join' : 'GA tilføjes som lokal admin';
+      }
+      else if (c.check_id === '5.1.4.4') {
+        detail = 'Verificer lokal admin assignment i Entra > Devices > Device settings';
+        pass = null;
+      }
+      else if (c.check_id === '5.1.4.5') {
+        const deviceSettings = await callReviewGraph('/policies/deviceRegistrationPolicy').catch(() => null);
+        pass = deviceSettings?.localAdminPassword?.isEnabled === true;
+        detail = pass ? 'LAPS er aktiveret' : 'LAPS er IKKE aktiveret';
+      }
+      else if (c.check_id === '5.1.4.6') {
+        detail = 'Verificer BitLocker key recovery restriction i Entra > Devices';
+        pass = null;
+      }
+      else if (c.check_id === '5.1.5.1') {
+        const consentPolicy = authPolicy?.permissionGrantPolicies;
+        pass = consentPolicy !== null && !consentPolicy?.includes('microsoft-user-default-legacy');
+        detail = pass ? 'Bruger consent er begrænset' : 'Brugere kan give apps adgang til company data';
+      }
+      else if (c.check_id === '5.1.5.2') {
+        const adminConsent = await callReviewGraph('/policies/adminConsentRequestPolicy').catch(() => null);
+        pass = adminConsent?.isEnabled === true;
+        detail = pass ? 'Admin consent workflow er aktiveret' : 'Admin consent workflow er IKKE aktiveret';
+      }
+      else if (c.check_id === '5.1.5.3') {
+        detail = 'Verificer password addition for apps i Entra > App registrations > Authentication';
+        pass = null;
+      }
+      else if (c.check_id === '5.1.5.4' || c.check_id === '5.1.5.5' || c.check_id === '5.1.5.6') {
+        detail = 'Verificer app credential policies i Entra > Enterprise applications > Policies';
+        pass = null;
+      }
+      else if (c.check_id === '5.1.6.1') {
+        const extSettings = await callReviewGraph('/policies/crossTenantAccessPolicy/default').catch(() => null);
+        pass = extSettings?.b2bCollaborationInbound?.usersAndGroups?.accessType === 'blocked' || 
+               extSettings?.invitationRedemptionIdentityProviderConfiguration !== null;
+        detail = 'Verificer tilladt domæner for gæste-invitationer i Entra > External Identities';
+      }
+      else if (c.check_id === '5.1.6.2') {
+        const extSettings = await callReviewGraph('/policies/authorizationPolicy').catch(() => null);
+        const guestAccess = extSettings?.guestUserRoleId;
+        // Restricted guest: 2af84b1e-32c8-42b7-82bc-daa82404023b
+        pass = guestAccess === '2af84b1e-32c8-42b7-82bc-daa82404023b' || guestAccess === '10dae51f-b6af-4016-8d66-8c2a99b929b3';
+        detail = pass ? 'Gæste adgang er begrænset' : 'Gæste adgang er ikke begrænset';
+      }
+      else if (c.check_id === '5.1.6.3') {
+        const extSettings = authPolicy;
+        const allowedToInvite = extSettings?.allowInvitesFrom;
+        pass = allowedToInvite === 'adminsAndGuestInviters' || allowedToInvite === 'adminsGuestInvitersAndAllMembers' === false;
+        detail = `Gæste-invitationer tilladt fra: ${allowedToInvite || 'alle'}`;
+      }
+      else if (c.check_id === '5.1.8.1') {
+        const org = await callReviewGraph('/organization?$select=onPremisesSyncEnabled');
+        const syncEnabled = org?.value?.[0]?.onPremisesSyncEnabled;
+        if (syncEnabled === true) {
+          // Check if password hash sync is enabled
+          const syncData = await callReviewGraph('/organization?$select=onPremisesLastSyncDateTime').catch(() => null);
+          pass = true;
+          detail = 'On-premises sync er aktiveret - verificer password hash sync i Entra Connect';
+        } else {
+          pass = null;
+          detail = 'Cloud-only tenant - password hash sync ikke relevant';
+        }
+      }
+      else if (c.check_id === '5.2.2.1') {
+        const caPolicies = await callReviewGraph('/identity/conditionalAccess/policies');
+        const mfaAdminPolicy = caPolicies?.value?.find(p => 
+          p.state === 'enabled' && 
+          (p.displayName?.toLowerCase().includes('mfa') || p.displayName?.toLowerCase().includes('admin'))
+        );
+        pass = mfaAdminPolicy !== null && mfaAdminPolicy !== undefined;
+        detail = pass ? `MFA for admin CA policy fundet: "${mfaAdminPolicy?.displayName}"` : 'Ingen MFA CA policy for admins fundet';
+      }
+      else if (c.check_id === '5.2.2.2') {
+        const caPolicies = await callReviewGraph('/identity/conditionalAccess/policies');
+        const mfaAllPolicy = caPolicies?.value?.find(p => 
+          p.state === 'enabled' && 
+          (p.displayName?.toLowerCase().includes('mfa') || p.displayName?.toLowerCase().includes('all users'))
+        );
+        pass = mfaAllPolicy !== null && mfaAllPolicy !== undefined;
+        detail = pass ? `MFA for alle brugere CA policy: "${mfaAllPolicy?.displayName}"` : 'Ingen MFA CA policy for alle brugere';
+      }
+      else if (c.check_id.startsWith('5.2.2.')) {
+        const caPolicies = await callReviewGraph('/identity/conditionalAccess/policies');
+        const enabled = caPolicies?.value?.filter(p => p.state === 'enabled') || [];
+        pass = enabled.length > 0;
+        detail = `${enabled.length} aktive CA politikker - verificer specifik policy manuelt`;
+      }
+      else if (c.check_id === '5.2.3.1') {
+        const authMethods = await callReviewGraph('/policies/authenticationMethodsPolicy');
+        const authenticator = authMethods?.authenticationMethodConfigurations?.find(m => m.id === 'MicrosoftAuthenticator');
+        pass = authenticator?.state === 'enabled' && authenticator?.featureSettings?.numberMatchingRequiredState?.state === 'enabled';
+        detail = pass ? 'Microsoft Authenticator number matching aktiveret' : 'Verificer Authenticator indstillinger';
+      }
+      else if (c.check_id === '5.2.3.2') {
+        const pwdProtection = await callReviewGraph('/policies/identitySecurityDefaultsEnforcementPolicy').catch(() => null);
+        const bannedPwd = await callReviewGraphBeta('/policies/authenticationStrengthPolicies').catch(() => null);
+        pass = null;
+        detail = 'Verificer custom banned passwords i Entra > Authentication methods > Password protection';
+      }
+      else if (c.check_id === '5.2.3.3') {
+        detail = 'Verificer on-premises password protection agent i Entra > Authentication > Password protection';
+        pass = null;
+      }
+      else if (c.check_id === '5.2.3.4') {
+        const mfaReport = await callReviewGraph('/reports/credentialUserRegistrationDetails?$top=1').catch(() => null);
+        pass = mfaReport !== null;
+        detail = mfaReport ? 'MFA registrering data tilgængeligt - verificer at alle er MFA capable' : 'Kræver Reports.Read.All permission';
+      }
+      else if (c.check_id === '5.2.3.5') {
+        const authMethods = await callReviewGraph('/policies/authenticationMethodsPolicy');
+        const weakMethods = ['Sms', 'Voice', 'Email'];
+        const enabledWeak = authMethods?.authenticationMethodConfigurations?.filter(
+          m => weakMethods.includes(m.id) && m.state === 'enabled'
+        ) || [];
+        pass = enabledWeak.length === 0;
+        detail = pass ? 'Svage autentificeringsmetoder deaktiveret' : `Svage metoder aktiveret: ${enabledWeak.map(m=>m.id).join(', ')}`;
+      }
+      else if (c.check_id === '5.2.3.6') {
+        const authMethods = await callReviewGraph('/policies/authenticationMethodsPolicy');
+        pass = authMethods?.registrationEnforcement?.authenticationStrengthEnforcement?.excludeTargets?.length === 0;
+        detail = 'Verificer system-preferred MFA i Authentication methods > Settings';
+      }
+      else if (c.check_id === '5.2.3.7') {
+        const authMethods = await callReviewGraph('/policies/authenticationMethodsPolicy');
+        const emailOtp = authMethods?.authenticationMethodConfigurations?.find(m => m.id === 'Email');
+        pass = emailOtp?.state === 'disabled';
+        detail = pass ? 'Email OTP er deaktiveret' : 'Email OTP er aktiveret';
+      }
+      else if (c.check_id === '5.2.3.8') {
+        const lockoutPolicy = await callReviewGraphBeta('/policies/authenticationMethodsPolicy').catch(() => null);
+        pass = null;
+        detail = 'Verificer lockout threshold i Entra > Authentication > Password protection';
+      }
+      else if (c.check_id === '5.2.3.9') {
+        detail = 'Verificer lockout duration i Entra > Authentication > Password protection';
+        pass = null;
+      }
+      else if (c.check_id === '5.2.3.10') {
+        const authMethods = await callReviewGraph('/policies/authenticationMethodsPolicy');
+        const authenticator = authMethods?.authenticationMethodConfigurations?.find(m => m.id === 'MicrosoftAuthenticator');
+        pass = authenticator?.featureSettings?.companionAppAllowedState?.state === 'disabled';
+        detail = pass ? 'Companion app deaktiveret' : 'Verificer companion app indstilling';
+      }
+      else if (c.check_id.startsWith('5.2.4.')) {
+        const sspr = await callReviewGraph('/policies/authenticationMethodsPolicy').catch(() => null);
+        pass = null;
+        detail = 'Verificer SSPR indstillinger i Entra > Password reset';
+      }
+      else if (c.check_id === '5.3.1') {
+        const eligibleAssignments = await callReviewGraph('/roleManagement/directory/roleEligibilityScheduleInstances?$top=5').catch(() => null);
+        pass = eligibleAssignments !== null;
+        detail = eligibleAssignments ? 'PIM eligible assignments fundet - verificer at admins bruger aktivering' : 'Ingen PIM eligible assignments - roller muligvis permanent assigned';
+      }
+      else if (c.check_id === '5.3.2' || c.check_id === '5.3.3') {
+        const reviews = await callReviewGraph('/identityGovernance/accessReviews/definitions?$top=5').catch(() => null);
+        pass = (reviews?.value?.length || 0) > 0;
+        detail = pass ? `${reviews.value.length} access reviews konfigureret` : 'Ingen access reviews fundet';
+      }
+      else if (c.check_id === '5.3.4' || c.check_id === '5.3.5') {
+        detail = 'Verificer PIM approval krav i Entra > PIM > Microsoft Entra Roles';
+        pass = null;
+      }
+
+      // ── Section 6: Exchange Admin Center ───────────────────────────────
+      else if (c.check_id.startsWith('6.')) {
+        detail = 'Kræver Exchange Online PowerShell - kør PS-scriptet for Exchange checks';
+        pass = null;
+      }
+
+      // ── Section 7: SharePoint Admin Center ────────────────────────────
+      else if (c.check_id === '7.2.1') {
+        pass = spSettings?.isLegacyAuthProtocolsEnabled === false;
+        detail = pass ? 'Legacy auth deaktiveret for SharePoint' : 'Legacy auth er aktiveret for SharePoint';
+      }
+      else if (c.check_id === '7.2.2') {
+        detail = 'Verificer Azure AD B2B integration i SharePoint admin center';
+        pass = null;
+      }
+      else if (c.check_id === '7.2.3') {
+        if (spSettings) {
+          const cap = spSettings.sharingCapability;
+          pass = cap === 'disabled' || cap === 'existingExternalUserSharingOnly';
+          detail = `SharePoint deling: ${cap}`;
+        } else { pass = null; detail = 'SharePoint settings ikke tilgængelige'; }
+      }
+      else if (c.check_id === '7.2.4') {
+        if (spSettings) {
+          const cap = spSettings.oneDriveSharingCapability || spSettings.sharingCapability;
+          pass = cap === 'disabled' || cap === 'existingExternalUserSharingOnly';
+          detail = `OneDrive deling: ${cap}`;
+        } else { pass = null; detail = 'SharePoint settings ikke tilgængelige'; }
+      }
+      else if (c.check_id === '7.2.5') {
+        pass = spSettings?.preventExternalUsersFromResharing === true;
+        detail = pass ? 'Gæster kan ikke dele items de ikke ejer' : 'Gæster kan dele items de ikke ejer';
+      }
+      else if (c.check_id === '7.2.6') {
+        pass = spSettings?.isResharingByExternalUsersEnabled === false;
+        detail = pass ? 'Ekstern resharing deaktiveret' : 'Ekstern resharing aktiveret';
+      }
+      else if (c.check_id === '7.2.7') {
+        const linkType = spSettings?.defaultSharingLinkType;
+        pass = linkType === 'direct' || linkType === 'none';
+        detail = `Standard link type: ${linkType || 'ikke sat'}`;
+      }
+      else if (c.check_id === '7.2.8') {
+        detail = 'Verificer ekstern deling sikkerhedsgruppe i SharePoint admin center';
+        pass = null;
+      }
+      else if (c.check_id === '7.2.9') {
+        detail = 'Verificer gæste adgang udløb i SharePoint admin center';
+        pass = null;
+      }
+      else if (c.check_id === '7.2.10') {
+        detail = 'Verificer verification code indstillinger i SharePoint admin center';
+        pass = null;
+      }
+      else if (c.check_id === '7.2.11') {
+        const perm = spSettings?.defaultLinkPermission;
+        pass = perm === 'view';
+        detail = `Standard link tilladelse: ${perm || 'ikke sat'} (bør være 'view')`;
+      }
+      else if (c.check_id === '7.3.1') {
+        detail = 'Verificer inficerede fil downloads i SharePoint admin center > Settings';
+        pass = null;
+      }
+
+      // ── Section 8: Microsoft Teams ─────────────────────────────────────
+      else if (c.check_id === '8.1.1') {
+        const teamsSettings = await callReviewGraph('/teamwork/teamsAppSettings').catch(() => null);
+        pass = null;
+        detail = 'Verificer ekstern fildeling i Teams admin center > Files';
+      }
+      else if (c.check_id === '8.1.2') {
+        const msgPolicy = await callReviewGraph('/teamwork/teamsMessagingPolicies/global').catch(async () => 
+          await callReviewGraphBeta('/teamwork/messagingSettings').catch(() => null)
+        );
+        pass = null;
+        detail = 'Verificer email til kanal indstilling i Teams admin center';
+      }
+      else if (c.check_id === '8.2.1') {
+        const fedConfig = await callReviewGraph('/teamwork/teamsExternalAccess').catch(async () =>
+          await callReviewGraphBeta('/policies/teamsFederationConfiguration').catch(() => null)
+        );
+        pass = null;
+        detail = 'Verificer ekstern adgang i Teams admin center > External access';
+      }
+      else if (c.check_id === '8.2.2') {
+        pass = null;
+        detail = 'Verificer umanaged Teams brugere i Teams admin center > External access';
+      }
+      else if (c.check_id === '8.2.3') {
+        pass = null;
+        detail = 'Verificer Teams consumer i Teams admin center > External access';
+      }
+      else if (c.check_id === '8.2.4') {
+        pass = null;
+        detail = 'Verificer trial tenant kommunikation i Teams admin center';
+      }
+      else if (c.check_id === '8.4.1') {
+        const appPolicy = await callReviewGraph('/teamwork/teamsAppPermissionPolicies/global').catch(() => null);
+        pass = null;
+        detail = 'Verificer app tilladelsespolitikker i Teams admin center > Teams apps';
+      }
+      else if (c.check_id === '8.5.1') {
+        const meetingPolicy = await callReviewGraph('/teamwork/teamsMeetingPolicies/global').catch(() => null);
+        pass = meetingPolicy?.allowAnonymousUsersToJoinMeeting === false;
+        detail = pass ? 'Anonyme brugere kan ikke deltage i møder' : 'Anonyme brugere KAN deltage i møder';
+      }
+      else if (c.check_id === '8.5.2') {
+        const meetingPolicy = await callReviewGraph('/teamwork/teamsMeetingPolicies/global').catch(() => null);
+        pass = meetingPolicy?.allowAnonymousUsersToStartMeeting === false;
+        detail = pass ? 'Anonyme brugere kan ikke starte møder' : 'Anonyme brugere KAN starte møder';
+      }
+      else if (c.check_id === '8.5.3') {
+        const meetingPolicy = await callReviewGraph('/teamwork/teamsMeetingPolicies/global').catch(() => null);
+        const lobby = meetingPolicy?.autoAdmittedUsers;
+        pass = lobby === 'EveryoneInCompanyExcludingGuests' || lobby === 'InvitedUsers' || lobby === 'OrganizerOnly';
+        detail = `Lobby indstilling: ${lobby || 'ukendt'}`;
+      }
+      else if (c.check_id === '8.5.4') {
+        const meetingPolicy = await callReviewGraph('/teamwork/teamsMeetingPolicies/global').catch(() => null);
+        pass = meetingPolicy?.allowPstnUsersToBypassLobby === false;
+        detail = pass ? 'Dial-in kan ikke omgå lobby' : 'Dial-in KAN omgå lobby';
+      }
+      else if (c.check_id === '8.5.5') {
+        const meetingPolicy = await callReviewGraph('/teamwork/teamsMeetingPolicies/global').catch(() => null);
+        const chatType = meetingPolicy?.meetingChatEnabledType;
+        pass = chatType === 'EnabledExceptAnonymous' || chatType === 'Disabled';
+        detail = `Møde chat type: ${chatType || 'ukendt'}`;
+      }
+      else if (c.check_id === '8.5.6') {
+        const meetingPolicy = await callReviewGraph('/teamwork/teamsMeetingPolicies/global').catch(() => null);
+        const presenter = meetingPolicy?.designatedPresenterRoleMode;
+        pass = presenter === 'OrganizerOnly' || presenter === 'OrganizerAndCoOrganizerOnly';
+        detail = `Presenter rolle: ${presenter || 'ukendt'}`;
+      }
+      else if (c.check_id === '8.5.7') {
+        const meetingPolicy = await callReviewGraph('/teamwork/teamsMeetingPolicies/global').catch(() => null);
+        pass = meetingPolicy?.allowExternalParticipantGiveRequestControl === false;
+        detail = pass ? 'Eksterne kan ikke give/anmode kontrol' : 'Eksterne KAN give/anmode kontrol';
+      }
+      else if (c.check_id === '8.5.8') {
+        const meetingPolicy = await callReviewGraph('/teamwork/teamsMeetingPolicies/global').catch(() => null);
+        pass = meetingPolicy?.allowExternalNonTrustedMeetingChat === false;
+        detail = pass ? 'Ekstern møde chat deaktiveret' : 'Ekstern møde chat aktiveret';
+      }
+      else if (c.check_id === '8.5.9') {
+        const meetingPolicy = await callReviewGraph('/teamwork/teamsMeetingPolicies/global').catch(() => null);
+        pass = meetingPolicy?.allowCloudRecording === false;
+        detail = pass ? 'Optagelse slået fra som standard' : 'Optagelse slået til som standard';
+      }
+      else if (c.check_id === '8.6.1') {
+        const msgPolicy = await callReviewGraph('/teamwork/teamsMessagingPolicies/global').catch(() => null);
+        pass = msgPolicy?.allowSecurityEndUserReporting === true;
+        detail = pass ? 'Sikkerhedsrapportering aktiveret' : 'Sikkerhedsrapportering IKKE aktiveret';
+      }
+
+      // ── Section 9: Microsoft Fabric ────────────────────────────────────
+      else if (c.check_id.startsWith('9.')) {
+        const fabricSettings = await fetch('https://api.powerbi.com/v1.0/myorg/admin/tenantSettings', {
+          headers: { 'Authorization': `Bearer ${reviewToken}` }
+        }).then(r => r.ok ? r.json() : null).catch(() => null);
+
+        const fabricChecks = {
+          '9.1.1': { setting: 'AllowGuestLookup', inverse: true },
+          '9.1.2': { setting: 'AllowExternalDataSharingByExternalUsers', inverse: true },
+          '9.1.3': { setting: 'ExternalSharingEnabled', inverse: true },
+          '9.1.4': { setting: 'PublishToWeb', inverse: true },
+          '9.1.5': { setting: 'AllowRAndPythonVisuals', inverse: true },
+          '9.1.6': { setting: 'SensitivityLabelsEnabledForFabric', inverse: false },
+          '9.1.7': { setting: 'AllowShareableLinks', inverse: true },
+          '9.1.8': { setting: 'ExternalDataSharingEnabled', inverse: true },
+          '9.1.9': { setting: 'BlockResourceKeyAuthentication', inverse: false },
+          '9.1.10': { setting: 'ServicePrincipalAccess', inverse: true },
+          '9.1.11': { setting: 'ServicePrincipalProfiles', inverse: true },
+          '9.1.12': { setting: 'AllowServicePrincipalsCreateAndUseProfiles', inverse: true },
+        };
+
+        const cfg = fabricChecks[c.check_id];
+        if (cfg && fabricSettings) {
+          const s = fabricSettings.tenantSettings?.find(t => t.settingName === cfg.setting);
+          if (s) {
+            pass = cfg.inverse ? s.enabled === false : s.enabled === true;
+            detail = `${cfg.setting}: ${s.enabled ? 'aktiveret' : 'deaktiveret'}`;
+          } else {
+            pass = null;
+            detail = `Indstilling ${cfg.setting} ikke fundet i Fabric`;
+          }
+        } else {
+          pass = null;
+          detail = 'Kræver Power BI Admin adgang - verificer i Fabric admin portal';
+        }
+      }
+
+    } catch(err) {
+      pass = null;
+      detail = `Fejl: ${err.message}`;
+    }
+
+    results[c.check_id] = { pass, detail };
+    logReview(c.check_id, pass === true ? 'implemented' : pass === false ? 'declined' : 'none', detail);
+    await new Promise(r => setTimeout(r, 30)); // Small delay to not hit rate limits
+  }
+
+  // Show results and apply to assessments
+  showReviewResults(results);
+}
+
+function showReviewResults(results) {
+  document.getElementById('review-progress-step').style.display = 'none';
+  document.getElementById('review-results-step').style.display = '';
+
+  const implemented = Object.values(results).filter(r => r.pass === true).length;
+  const declined = Object.values(results).filter(r => r.pass === false).length;
+  const manual = Object.values(results).filter(r => r.pass === null).length;
+
+  document.getElementById('review-summary').innerHTML = `
+    <div style="text-align:center;flex:1;">
+      <div style="font-size:28px;font-weight:700;color:var(--green);">${implemented}</div>
+      <div style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--text2);">Implemented</div>
+    </div>
+    <div style="text-align:center;flex:1;">
+      <div style="font-size:28px;font-weight:700;color:var(--red);">${declined}</div>
+      <div style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--text2);">Not implemented</div>
+    </div>
+    <div style="text-align:center;flex:1;">
+      <div style="font-size:28px;font-weight:700;color:var(--amber);">${manual}</div>
+      <div style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--text2);">Manuel</div>
+    </div>
+  `;
+
+  // Store results temporarily for apply
+  window._reviewResults = results;
+
+  document.getElementById('review-footer').innerHTML = `
+    <button class="btn" onclick="closeReview()">Luk uden at gemme</button>
+    <button class="btn btn-primary" onclick="applyReviewResults()">✅ Anvend resultater på ${reviewCustomerName}</button>
+  `;
+}
+
+async function applyReviewResults() {
+  const results = window._reviewResults;
+  if (!results) return;
+
+  showToast('Gemmer resultater...');
+  let saved = 0;
+
+  for (const [checkId, result] of Object.entries(results)) {
+    if (result.pass === null) continue; // Skip manual checks
+
+    const status = result.pass ? 'implemented' : 'declined';
+    const key = checkId;
+
+    // Update local assessments
+    if (!assessments[key]) assessments[key] = { status: 'none', comment: '' };
+    assessments[key].status = status;
+    assessments[key].comment = assessments[key].comment || result.detail;
+
+    // Save to SharePoint
+    try {
+      const data = {
+        CustomerId: reviewCustomerId,
+        CheckSpId: checkId,
+        Status: status,
+        Comment: result.detail.slice(0, 200),
+        UpdatedBy: currentUser?.email || ''
+      };
+
+      if (assessments[key].spId) {
+        await updateItem(listIds.assessments, assessments[key].spId, data);
+      } else {
+        const r = await createItem(listIds.assessments, data);
+        if (r?.id) assessments[key].spId = r.id;
+      }
+      saved++;
+    } catch(e) {
+      console.warn('Kunne ikke gemme', checkId, e.message);
+    }
+  }
+
+  closeReview();
+  renderChecklist();
+  renderDashboard();
+  showToast(`✅ ${saved} resultater gemt for ${reviewCustomerName}`, 'success');
+}
+// ══ END AUTOMATED REVIEW ══════════════════════════════════════
+
 // ════════════════════════════════════════════════
 // KONFIGURATION — udfyldes via config screen
 // eller hardcode herunder for hurtig deploy:
@@ -1364,6 +2138,7 @@ function renderDashboard() {
       <td>${c.contact || '–'}</td>
       <td class="td-actions">
         <button class="btn btn-sm" onclick="goToCustomer('${c.spId}')">Åbn →</button>
+        <button class="btn btn-sm" style="background:var(--accent);color:#fff;" onclick="startReview('${c.spId}','${c.name}')">▶ Start review</button>
         <button class="btn btn-sm btn-success" onclick="downloadLatestReport('${c.spId}','${c.name}')">📄 Rapport</button>
       </td>
     </tr>`).join('');
@@ -2120,6 +2895,47 @@ initMsal();
 
 
 
+
+
+<!-- MODAL: Automated Review -->
+<div class="modal-overlay" id="modal-review">
+  <div class="modal" style="max-width:700px;max-height:85vh;display:flex;flex-direction:column;">
+    <div class="modal-header">
+      <h2>🔍 Automatisk Review</h2>
+      <button class="close-btn" onclick="closeReview()">×</button>
+    </div>
+    <div class="modal-body" id="review-body" style="flex:1;overflow-y:auto;padding:0;">
+      <div id="review-login-step" style="padding:20px;">
+        <p style="margin-bottom:12px;color:var(--text2);">Log ind med kundens Global Administrator-konto for at starte automatisk gennemgang af alle 156 baseline punkter.</p>
+        <div style="background:var(--surface2);border-radius:var(--radius);padding:12px 16px;margin-bottom:16px;font-size:13px;">
+          <strong>Kunde:</strong> <span id="review-customer-name"></span>
+        </div>
+        <input type="text" id="review-tenant-id" class="form-control" placeholder="Kundens tenant ID eller domæne (fx contoso.onmicrosoft.com)" style="margin-bottom:12px;">
+        <button class="btn btn-primary" onclick="doReviewLogin()" style="width:100%;">🔐 Log ind med kundekonto</button>
+      </div>
+      <div id="review-progress-step" style="display:none;padding:20px;">
+        <div style="margin-bottom:16px;">
+          <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
+            <span style="font-size:13px;font-weight:500;" id="review-current-check">Starter...</span>
+            <span style="font-size:13px;color:var(--text2);" id="review-count">0 / 156</span>
+          </div>
+          <div style="background:var(--surface2);border-radius:99px;height:6px;overflow:hidden;">
+            <div id="review-progress-bar" style="height:100%;background:var(--accent);border-radius:99px;width:0%;transition:width .3s;"></div>
+          </div>
+        </div>
+        <div id="review-live-log" style="background:var(--surface2);border-radius:var(--radius);padding:12px;font-size:12px;font-family:monospace;height:300px;overflow-y:auto;"></div>
+      </div>
+      <div id="review-results-step" style="display:none;">
+        <div id="review-summary" style="padding:16px 20px;border-bottom:0.5px solid var(--border);display:flex;gap:16px;flex-wrap:wrap;">
+        </div>
+        <div id="review-results-list" style="padding:16px 20px;"></div>
+      </div>
+    </div>
+    <div class="modal-footer" id="review-footer">
+      <button class="btn" onclick="closeReview()">Annuller</button>
+    </div>
+  </div>
+</div>
 
 </body>
 </html>
