@@ -1261,7 +1261,7 @@ async function loadAssessments(customerId) {
   }
   const items = await getListItems(listIds.assessments);
   assessments = {};
-  items.filter(i => i.CustomerId === customerId).forEach(i => { assessments[i.CheckSpId] = { spId: i.spId, status: i.Status || 'none', comment: i.Comment || '' }; });
+  items.filter(i => i.CustomerId === customerId && i.CheckSpId !== 'LATEST_REPORT').forEach(i => { assessments[i.CheckSpId] = { spId: i.spId, status: i.Status || 'none', comment: i.Comment || '' }; });
 }
 
 function normalizeCheck(i) {
@@ -1439,7 +1439,7 @@ function renderChecklist() {
 }
 
 function renderCard(c) {
-  var a = assessments[c.spId] || { status: 'none', comment: '' };
+  var a = assessments[c.check_id] || { status: 'none', comment: '' };
   var labels = { none:'Ikke vurderet', implemented:'Implemented', declined:'Declined', review:'Under review', accepted:'Accepted' };
   var isOpen = openCard === c.spId;
   var activeTab = cardTabs[c.spId] || 'overview';
@@ -1491,8 +1491,10 @@ function toggleCard(spId) {
 
 async function setStatus(spId, status) {
   if (!selectedCustomer) return;
-  if (!assessments[spId]) assessments[spId] = { status:'none', comment:'' };
-  assessments[spId].status = status;
+  const c = checks.find(c => c.spId === spId || c.check_id === spId);
+  const key = c ? c.check_id : spId;
+  if (!assessments[key]) assessments[key] = { status:'none', comment:'' };
+  assessments[key].status = status;
   renderChecklist();
   openCard = spId;
   await saveAssessment(spId);
@@ -1500,25 +1502,29 @@ async function setStatus(spId, status) {
 
 async function setComment(spId, val) {
   if (!selectedCustomer) return;
-  if (!assessments[spId]) assessments[spId] = { status:'none', comment:'' };
-  assessments[spId].comment = val;
+  const c = checks.find(c => c.spId === spId || c.check_id === spId);
+  const key = c ? c.check_id : spId;
+  if (!assessments[key]) assessments[key] = { status:'none', comment:'' };
+  assessments[key].comment = val;
   clearTimeout(saveTimers[spId]);
   saveTimers[spId] = setTimeout(() => saveAssessment(spId), 800);
 }
 
 async function saveAssessment(spId) {
   if (!selectedCustomer) return;
-  const a = assessments[spId] || { status:'none', comment:'' };
+  const c = checks.find(c => c.spId === spId || c.check_id === spId);
+  const key = c ? c.check_id : spId;
+  const a = assessments[key] || assessments[spId] || { status:'none', comment:'' };
   try {
     if (APP_CONFIG.demoMode) {
       if (!demoData.assessments[selectedCustomer.spId]) demoData.assessments[selectedCustomer.spId] = {};
       demoData.assessments[selectedCustomer.spId][spId] = { ...a };
     } else {
-      const data = { CustomerId: selectedCustomer.spId, CheckSpId: spId, Status: a.status, Comment: a.comment||'', UpdatedBy: currentUser?.email||'' };
+      const data = { CustomerId: selectedCustomer.spId, CheckSpId: key, Status: a.status, Comment: a.comment||'', UpdatedBy: currentUser?.email||'' };
       if (a.spId) await updateItem(listIds.assessments, a.spId, data);
       else {
         const r = await createItem(listIds.assessments, data);
-        assessments[spId].spId = r.id;
+        assessments[key || spId].spId = r.id;
       }
     }
     const dot = document.getElementById('dot-'+spId);
