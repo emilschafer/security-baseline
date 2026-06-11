@@ -1199,20 +1199,23 @@ async function loadChecks() {
     checks = demoData.checks.filter(c => !c.Archived).map(normalizeCheck).sort((a,b) => a.check_id.localeCompare(b.check_id));
     return;
   }
+  // checks.json er altid kilden til check-indhold
+  // SharePoint BaselineChecks bruges kun til at gemme brugeroprettede/redigerede punkter
+  await loadChecksFromFile();
   try {
+    // Hent custom checks fra SharePoint (dem der er tilføjet via appen)
     const items = await getListItems(listIds.checks);
-    const spChecks = items.filter(i => i.CheckId && !i.Archived).map(normalizeCheck);
-    if (spChecks.length > 0) {
-      checks = spChecks.sort((a,b) => a.check_id.localeCompare(b.check_id));
-      // Auto-synk nye punkter fra checks.json hvis der mangler nogen
-      syncChecksToSharePoint(items).catch(e => console.warn('Sync fejlede:', e));
-    } else {
-      await loadChecksFromFile();
-      await syncChecksToSharePoint([]);
+    const customChecks = items.filter(i => i.CheckId && !i.Archived);
+    // Tilføj/erstat med custom checks der ikke er i checks.json
+    const fileIds = new Set(checks.map(c => c.check_id));
+    for (const item of customChecks) {
+      if (!fileIds.has(item.CheckId)) {
+        checks.push(normalizeCheck(item));
+      }
     }
+    checks.sort((a,b) => a.check_id.localeCompare(b.check_id));
   } catch(e) {
-    console.warn('Kunne ikke hente checks fra SharePoint, bruger checks.json:', e);
-    await loadChecksFromFile();
+    console.warn('Kunne ikke hente custom checks fra SharePoint:', e);
   }
 }
 
@@ -1238,47 +1241,8 @@ async function loadChecksFromFile() {
   })).sort((a,b) => a.check_id.localeCompare(b.check_id));
 }
 
-async function syncChecksToSharePoint(spChecks) {
-  // Auto-importer checks fra checks.json til SharePoint hvis der mangler nogle
-  if (APP_CONFIG.demoMode) return;
-  try {
-    const r = await fetch('checks.json');
-    const raw = await r.json();
-    const existingIds = new Set(spChecks.map(c => c.CheckId || c.check_id).filter(Boolean));
-    const missing = raw.filter(c => !existingIds.has(c.check_id));
-    
-    if (missing.length === 0) return;
-    
-    console.log(`Importerer ${missing.length} nye baseline punkter til SharePoint...`);
-    showToast(`Importerer ${missing.length} nye punkter...`);
-    
-    for (let i = 0; i < missing.length; i++) {
-      const c = missing[i];
-      const data = {
-        CheckId: c.check_id,
-        CheckTitle: c.title,
-        CheckType: c.type || 'Manual',
-        Section: c.section || '',
-        Subsection: c.subsection || '',
-        Profiles: JSON.stringify(c.profiles || []),
-        Description: c.description || '',
-        Rationale: c.rationale || '',
-        Impact: c.impact || '',
-        AuditUI: JSON.stringify(c.audit_ui || []),
-        AuditPS: c.audit_ps || '',
-        Remediation: JSON.stringify(c.remediation || []),
-        SortOrder: c.sort_order || i,
-        Archived: false
-      };
-      await createItem(listIds.checks, data);
-    }
-    
-    console.log(`✅ ${missing.length} punkter importeret til SharePoint`);
-    showToast(`✅ ${missing.length} nye punkter tilføjet`, 'success');
-  } catch(e) {
-    console.warn('Auto-import fejlede:', e);
-  }
-}
+// syncChecksToSharePoint removed - checks.json is source of truth
+
 
 
 async function loadCustomers() {
