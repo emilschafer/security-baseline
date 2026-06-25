@@ -3,15 +3,13 @@
     "rewrite": "/index.html",
     "exclude": [
       "/checks.json",
-      "/msal-browser.min.js",
-      "/msal-browser.js",
       "/blank.html",
       "/*.js",
       "/*.json"
     ]
   },
   "globalHeaders": {
-    "Content-Security-Policy": "default-src 'self' 'unsafe-inline' 'unsafe-eval' https: data: blob:; connect-src 'self' https://graph.microsoft.com https://login.microsoftonline.com https://addvisiondk.sharepoint.com https://login.windows.net https://api.powerbi.com https://analysis.windows.net;"
+    "Content-Security-Policy": "default-src 'self' 'unsafe-inline' 'unsafe-eval' https: data: blob:; connect-src 'self' https://graph.microsoft.com https://login.microsoftonline.com https://addvisiondk.sharepoint.com https://login.windows.net https://api.powerbi.com https://analysis.windows.net https://baseline-function-app-dxbkb8d2gsadekdv.westeurope-01.azurewebsites.net;"
   },
   "mimeTypes": {
     ".json": "application/json",
