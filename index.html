@@ -2579,19 +2579,29 @@ function renderChecklist() {
   const el = document.getElementById('checklist');
   if (!selectedCustomer) { el.innerHTML = '<div class="empty-state">Vælg en kunde for at starte gennemgangen</div>'; document.getElementById('nav-controls').style.display='none'; updateProgress(); return; }
   if (!list.length) { el.innerHTML = '<div class="empty-state">Ingen punkter matcher filteret</div>'; document.getElementById('nav-controls').style.display='none'; return; }
-  // Group by subsection
-  const bySubsec = {};
+  // Group by section then subsection
+  const bySection = {};
   list.forEach(c => {
-    const key = c.subsection || c.section || 'Andet';
-    if(!bySubsec[key]) bySubsec[key] = [];
-    bySubsec[key].push(c);
+    const sec = c.section || 'Andet';
+    const sub = c.subsection || '';
+    if (!bySection[sec]) bySection[sec] = {};
+    if (!bySection[sec][sub]) bySection[sec][sub] = [];
+    bySection[sec][sub].push(c);
   });
   let html = '';
-  for(const [sub, subChecks] of Object.entries(bySubsec)) {
-    if(Object.keys(bySubsec).length > 1) {
-      html += `<div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);padding:10px 2px 6px;border-bottom:0.5px solid var(--border);margin-bottom:6px;margin-top:8px;">${sub} <span style="font-weight:400;color:var(--text3);">(${subChecks.length})</span></div>`;
+  const sections = Object.keys(bySection);
+  for (const sec of sections) {
+    const subsections = bySection[sec];
+    const totalInSection = Object.values(subsections).flat().length;
+    // Section header
+    html += `<div style="font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text2);padding:16px 2px 8px;border-bottom:2px solid var(--border);margin-bottom:8px;margin-top:${sections.indexOf(sec) > 0 ? '24px' : '8px'};">${sec} <span style="font-weight:400;font-size:11px;">(${totalInSection})</span></div>`;
+    // Subsections
+    for (const [sub, subChecks] of Object.entries(subsections)) {
+      if (sub) {
+        html += `<div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);padding:10px 2px 6px;border-bottom:0.5px solid var(--border);margin-bottom:6px;margin-top:12px;">${sub} <span style="font-weight:400;color:var(--text3);">(${subChecks.length})</span></div>`;
+      }
+      html += subChecks.map(c => renderCard(c)).join('');
     }
-    html += subChecks.map(c => renderCard(c)).join('');
   }
   el.innerHTML = html;
   document.getElementById('nav-controls').style.display = 'flex';
