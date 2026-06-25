@@ -991,6 +991,7 @@ async function doReviewLogin() {
       account: resp.account
     });
     reviewToken = tokenResp.accessToken;
+    reviewTenantId = resp.account.tenantId;
 
     showToast(`Logget ind som ${resp.account.username}`, 'success');
     runAutomatedReview();
@@ -1035,6 +1036,26 @@ function updateReviewProgress(current, total, checkId) {
   document.getElementById('review-progress-bar').style.width = `${Math.round(current/total*100)}%`;
 }
 
+
+async function callAzureFunction() {
+  if (!APP_CONFIG.azureFunctionUrl) return {};
+  try {
+    const r = await fetch(APP_CONFIG.azureFunctionUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        accessToken: reviewToken,
+        tenantId: reviewTenantId
+      })
+    });
+    if (!r.ok) return {};
+    return r.json();
+  } catch(e) {
+    console.warn('Azure Function fejl:', e);
+    return {};
+  }
+}
+
 async function runAutomatedReview() {
   document.getElementById('review-login-step').style.display = 'none';
   document.getElementById('review-progress-step').style.display = '';
@@ -1043,6 +1064,15 @@ async function runAutomatedReview() {
   const results = {};
   const total = checks.length;
   let current = 0;
+
+  // Call Azure Function for Exchange/Teams checks in parallel
+  window._psResults = {};
+  if (APP_CONFIG.azureFunctionUrl) {
+    callAzureFunction().then(r => {
+      window._psResults = r || {};
+      console.log(`Azure Function: ${Object.keys(window._psResults).length} PS resultater`);
+    }).catch(e => console.warn('Azure Function fejlede:', e));
+  }
 
   // Pre-fetch Secure Score controls for Exchange/Defender checks
   try {
@@ -1159,6 +1189,12 @@ async function runAutomatedReview() {
 
       // ── Section 2: Microsoft Defender ──────────────────────────────────
       else if (c.check_id.startsWith('2.')) {
+        // Use Azure Function PS results if available
+        if (window._psResults?.[c.check_id] !== undefined) {
+          const r = window._psResults[c.check_id];
+          pass = r.pass;
+          detail = r.detail;
+        } else {
         const defenderMap = {
           '2.1.1': { id: 'EnableSafeLinksPolicies', name: 'Safe Links' },
           '2.1.2': { id: 'EnableMalwareFilterPolicies', name: 'Attachment filter' },
@@ -1197,6 +1233,7 @@ async function runAutomatedReview() {
           pass = null;
           detail = `Verificer i Microsoft Defender portal > Email & collaboration > Policies`;
         }
+      }
       }
 
       // ── Section 3: Microsoft Purview ───────────────────────────────────
@@ -1531,6 +1568,11 @@ async function runAutomatedReview() {
 
       // ── Section 8: Microsoft Teams ─────────────────────────────────────
       else if (c.check_id.startsWith('8.')) {
+        if (window._psResults?.[c.check_id] !== undefined) {
+          const r = window._psResults[c.check_id];
+          pass = r.pass;
+          detail = r.detail;
+        } else {
         // Teams policies kræver Teams PowerShell - markeres som manuelle
         const teamsManualChecks = {
           '8.1.1': 'Verificer ekstern fildeling i Teams admin center > Teams apps > Files',
@@ -1553,9 +1595,8 @@ async function runAutomatedReview() {
         };
         pass = null;
         detail = teamsManualChecks[c.check_id] || 'Verificer i Teams admin center';
-      }
-
-// ── Section 9: Microsoft Fabric ────────────────────────────────────
+        }
+      } // ── Section 9: Microsoft Fabric ────────────────────────────────────
       else if (c.check_id.startsWith('9.')) {
         // Power BI API requires separate token scope - try via Graph instead
         const fabricSettings = null; // Power BI Admin API not available via Graph
@@ -1692,6 +1733,7 @@ let APP_CONFIG = {
   clientId: '1eff8589-1843-48be-9429-e06117d4cc63',
   tenantId: '3be88606-ec35-4fb0-9e0a-7959e388d330',
   siteUrl: 'https://addvisiondk.sharepoint.com/sites/SecurityBaseline',
+  azureFunctionUrl: 'https://baseline-function-app-dxbkb8d2gsadekdv.westeurope-01.azurewebsites.net/api/BaselineReview?code=JHoegCVOKb0-XkrwDECObwYQv-HK8nUMVBoPUk2r7vcKAzFu0Eh27A==',
   demoMode: false
 };
 
