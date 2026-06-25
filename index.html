@@ -1130,11 +1130,24 @@ async function runAutomatedReview() {
     })();
   }
 
-  // Pre-fetch Secure Score controls for Exchange/Defender checks
+  // Pre-fetch Secure Score controls and current score
   try {
-    const secureScoreResp = await callReviewGraph('/security/secureScoreControlProfiles?$top=200');
+    const [secureScoreResp, currentScoreResp] = await Promise.all([
+      callReviewGraph('/security/secureScoreControlProfiles?$top=200'),
+      callReviewGraph('/security/secureScores?$top=1')
+    ]);
     window._secureScoreControls = secureScoreResp?.value || [];
-    console.log(`Secure Score: ${window._secureScoreControls.length} controls loaded`);
+    const currentScore = currentScoreResp?.value?.[0];
+    if (currentScore) {
+      window._currentSecureScore = {
+        current: Math.round(currentScore.currentScore),
+        max: Math.round(currentScore.maxScore),
+        pct: Math.round((currentScore.currentScore / currentScore.maxScore) * 100),
+        date: currentScore.createdDateTime?.split('T')[0]
+      };
+      console.log(`Secure Score: ${window._currentSecureScore.current}/${window._currentSecureScore.max} (${window._currentSecureScore.pct}%)`);
+    }
+    console.log(`Secure Score controls: ${window._secureScoreControls.length} loaded`);
   } catch(e) { window._secureScoreControls = []; }
 
   // Pre-fetch commonly needed data
@@ -1657,21 +1670,120 @@ async function runAutomatedReview() {
         detail = pass ? 'Companion app deaktiveret' : 'Verificer companion app indstilling';
       }
       else if (c.check_id.startsWith('5.2.4.')) {
-        const sspr = await callReviewGraph('/policies/authenticationMethodsPolicy').catch(() => null);
-        pass = null;
-        detail = 'Verificer SSPR indstillinger i Entra > Password reset';
+        try {
+          const sspr = await callReviewGraphBeta('/policies/selfServicePasswordResetPolicy').catch(() => null);
+          if (sspr) {
+            if (c.check_id === '5.2.4.1') {
+              pass = sspr.allowedResetAuthenticationMethods?.length > 0 && sspr.registrationRequiredByUsers !== false;
+              detail = `SSPR: ${JSON.stringify(sspr.allowedResetAuthenticationMethods || [])}`;
+            } else if (c.check_id === '5.2.4.2') {
+              pass = (sspr.numberOfAuthenticationMethodsRequired || 1) >= 2;
+              detail = `Metoder påkrævet: ${sspr.numberOfAuthenticationMethodsRequired || 1} (skal være 2)`;
+            } else if (c.check_id === '5.2.4.3') {
+              pass = sspr.registrationRequiredByUsers === true;
+              detail = `Registrering påkrævet: ${sspr.registrationRequiredByUsers}`;
+            } else if (c.check_id === '5.2.4.4') {
+              pass = sspr.notifyUsersOnPasswordReset === true;
+              detail = `Notificer brugere: ${sspr.notifyUsersOnPasswordReset}`;
+            } else if (c.check_id === '5.2.4.5') {
+              pass = sspr.notifyOnAdminPasswordReset === true;
+              detail = `Notificer admins: ${sspr.notifyOnAdminPasswordReset}`;
+            }
+          } else {
+            pass = null;
+            detail = 'Verificer SSPR i Entra > Password reset';
+          }
+        } catch(e) {
+          pass = null;
+          detail = 'Verificer SSPR i Entra > Password reset';
+        }
       }
       else if (c.check_id === '5.3.1') {
-        pass = null;
-        detail = 'Verificer PIM eligible assignments i Entra > PIM > Microsoft Entra Roles > Eligible assignments';
+        try {
+          const eligible = await callReviewGraph('/roleManagement/directory/roleEligibilityScheduleInstances?$top=10&$select=roleDefinitionId,principalId,status').catch(() => null);
+          const active = await callReviewGraph("/roleManagement/directory/roleAssignmentScheduleInstances?$top=10&$select=roleDefinitionId,endDateTime,assignmentType").catch(() => null);
+          const permanentActive = active?.value?.filter(a => !a.endDateTime && a.assignmentType === 'Assigned') || [];
+          pass = (eligible?.value?.length || 0) > 0 && permanentActive.length === 0;
+          detail = pass
+            ? `PIM aktiveret: ${eligible.value.length} eligible assignments, ingen permanente`
+            : permanentActive.length > 0
+              ? `${permanentActive.length} permanente role assignments - bør bruge PIM aktivering`
+              : 'Ingen eligible assignments - PIM muligvis ikke konfigureret';
+        } catch(e) {
+          pass = null;
+          detail = 'Verificer PIM i Entra > PIM > Microsoft Entra Roles';
+        }
       }
       else if (c.check_id === '5.3.2' || c.check_id === '5.3.3') {
-        pass = null;
-        detail = 'Kræver AccessReview.Read.All permission - verificer manuelt i Entra > Identity Governance';
+        try {
+          const reviews = await callReviewGraph('/identityGovernance/accessReviews/definitions?$top=20&$select=displayName,scope,status');
+          const allReviews = reviews?.value || [];
+          if (c.check_id === '5.3.2') {
+            const guestReviews = allReviews.filter(r => 
+              r.scope?.query?.includes('guest') || 
+              r.displayName?.toLowerCase().includes('guest')
+            );
+            pass = guestReviews.length > 0;
+            detail = pass ? `${guestReviews.length} access reviews for gæster konfigureret` : 'Ingen access reviews for gæstebrugere fundet';
+          } else {
+            const roleReviews = allReviews.filter(r =>
+              r.scope?.query?.includes('roleDefinitionId') ||
+              r.displayName?.toLowerCase().includes('role') ||
+              r.displayName?.toLowerCase().includes('privileged')
+            );
+            pass = roleReviews.length > 0;
+            detail = pass ? `${roleReviews.length} access reviews for privilegerede roller konfigureret` : 'Ingen access reviews for privilegerede roller fundet';
+          }
+        } catch(e) {
+          pass = null;
+          detail = 'Verificer access reviews i Entra > Identity Governance > Access reviews';
+        }
       }
       else if (c.check_id === '5.3.4' || c.check_id === '5.3.5') {
-        detail = 'Verificer PIM approval krav i Entra > PIM > Microsoft Entra Roles';
-        pass = null;
+        try {
+          // Global Admin role ID: 62e90394-69f5-4237-9190-012177145e10
+          // Privileged Role Admin: e8611ab8-c189-46e8-94e1-60213ab1f814
+          const roleId = c.check_id === '5.3.4' 
+            ? '62e90394-69f5-4237-9190-012177145e10'
+            : 'e8611ab8-c189-46e8-94e1-60213ab1f814';
+          const roleName = c.check_id === '5.3.4' ? 'Global Administrator' : 'Privileged Role Administrator';
+          
+          const policyAssignment = await callReviewGraph(
+            `/policies/roleManagementPolicies?$filter=scopeId eq '/' and scopeType eq 'DirectoryRole'&$top=50`
+          ).catch(() => null);
+          
+          if (policyAssignment?.value?.length > 0) {
+            // Find policy for this role
+            const assignment = await callReviewGraph(
+              `/policies/roleManagementPolicyAssignments?$filter=scopeId eq '/' and scopeType eq 'DirectoryRole' and roleDefinitionId eq '${roleId}'`
+            ).catch(() => null);
+            
+            if (assignment?.value?.[0]?.policyId) {
+              const policyId = assignment.value[0].policyId;
+              const rules = await callReviewGraph(
+                `/policies/roleManagementPolicies/${policyId}/rules`
+              ).catch(() => null);
+              
+              const approvalRule = rules?.value?.find(r => r.id === 'Approval_EndUser_Assignment');
+              if (approvalRule) {
+                pass = approvalRule.setting?.isApprovalRequired === true;
+                detail = pass ? `${roleName}: Godkendelse påkrævet for aktivering` : `${roleName}: Godkendelse IKKE påkrævet`;
+              } else {
+                pass = null;
+                detail = `Verificer godkendelseskrav for ${roleName} i PIM`;
+              }
+            } else {
+              pass = null;
+              detail = `Ingen PIM policy fundet for ${roleName}`;
+            }
+          } else {
+            pass = null;
+            detail = 'PIM ikke konfigureret - verificer manuelt i Entra > PIM';
+          }
+        } catch(e) {
+          pass = null;
+          detail = `Verificer PIM approval for ${c.check_id === '5.3.4' ? 'Global Admin' : 'Privileged Role Admin'} i Entra > PIM`;
+        }
       }
 
       // ── Section 6: Exchange Admin Center ───────────────────────────────
@@ -1892,6 +2004,13 @@ function showReviewResults(results) {
   const declined = Object.values(results).filter(r => r.pass === false).length;
   const manual = Object.values(results).filter(r => r.pass === null).length;
 
+  const scoreHtml = window._currentSecureScore ? `
+    <div style="text-align:center;flex:1;border-left:1px solid var(--border);padding-left:16px;">
+      <div style="font-size:28px;font-weight:700;color:var(--accent);">${window._currentSecureScore.pct}%</div>
+      <div style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--text2);">Secure Score</div>
+      <div style="font-size:10px;color:var(--text2);">${window._currentSecureScore.current}/${window._currentSecureScore.max} pts</div>
+    </div>` : '';
+
   document.getElementById('review-summary').innerHTML = `
     <div style="text-align:center;flex:1;">
       <div style="font-size:28px;font-weight:700;color:var(--green);">${implemented}</div>
@@ -1905,6 +2024,7 @@ function showReviewResults(results) {
       <div style="font-size:28px;font-weight:700;color:var(--amber);">${manual}</div>
       <div style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--text2);">Manuel</div>
     </div>
+    ${scoreHtml}
   `;
 
   // Store results temporarily for apply
@@ -1922,6 +2042,25 @@ async function applyReviewResults() {
 
   showToast('Gemmer resultater...');
   let saved = 0;
+
+  // Save Secure Score if available
+  if (window._currentSecureScore) {
+    try {
+      const scoreData = {
+        CustomerId: reviewCustomerId,
+        CheckSpId: 'SECURE_SCORE',
+        Status: 'none',
+        Comment: JSON.stringify(window._currentSecureScore),
+        UpdatedBy: currentUser?.email || ''
+      };
+      const existing = assessments['SECURE_SCORE'];
+      if (existing?.spId) {
+        await updateItem(listIds.assessments, existing.spId, scoreData);
+      } else {
+        await createItem(listIds.assessments, scoreData);
+      }
+    } catch(e) { console.warn('Kunne ikke gemme Secure Score:', e); }
+  }
 
   for (const [checkId, result] of Object.entries(results)) {
     if (result.pass === null) continue; // Skip manual checks
