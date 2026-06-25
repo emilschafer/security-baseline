@@ -993,11 +993,43 @@ async function doReviewLogin() {
     reviewToken = tokenResp.accessToken;
     reviewTenantId = resp.account.tenantId;
 
+    // Also get Exchange Online token
+    try {
+      const exoResp = await reviewMsalInstance.acquireTokenSilent({
+        scopes: ['https://outlook.office365.com/.default'],
+        account: resp.account
+      });
+      window._exoToken = exoResp.accessToken;
+    } catch(e) {
+      // Try popup if silent fails
+      try {
+        const exoResp = await reviewMsalInstance.acquireTokenPopup({
+          scopes: ['https://outlook.office365.com/Exchange.Manage'],
+          account: resp.account
+        });
+        window._exoToken = exoResp.accessToken;
+      } catch(e2) {
+        console.warn('EXO token ikke tilgængeligt:', e2.message);
+        window._exoToken = null;
+      }
+    }
+
     showToast(`Logget ind som ${resp.account.username}`, 'success');
     runAutomatedReview();
   } catch(e) {
     showToast('Login fejlede: ' + e.message, 'error');
   }
+}
+
+async function callExoAdmin(endpoint) {
+  if (!window._exoToken) return null;
+  try {
+    const r = await fetch(`https://outlook.office365.com/adminapi/beta/${reviewTenantId}/${endpoint}`, {
+      headers: { 'Authorization': `Bearer ${window._exoToken}`, 'Accept': 'application/json' }
+    });
+    if (!r.ok) return null;
+    return r.json();
+  } catch(e) { return null; }
 }
 
 async function callReviewGraph(endpoint, method = 'GET', body = null) {
@@ -1213,11 +1245,127 @@ async function runAutomatedReview() {
 
       // ── Section 2: Microsoft Defender ──────────────────────────────────
       else if (c.check_id.startsWith('2.')) {
-        // Use Azure Function PS results if available
         if (window._psResults?.[c.check_id] !== undefined) {
-          const r = window._psResults[c.check_id];
-          pass = r.pass;
-          detail = r.detail;
+          pass = window._psResults[c.check_id].pass;
+          detail = window._psResults[c.check_id].detail;
+        } else if (window._exoToken) {
+          // Use Exchange Online Admin REST API for Defender checks
+          if (c.check_id === '2.1.1') {
+            const r = await callExoAdmin('SafeLinksPolicy?$select=EnableSafeLinksForEmail,EnableSafeLinksForOffice,Name');
+            const enabled = r?.value?.filter(p => p.EnableSafeLinksForEmail || p.EnableSafeLinksForOffice) || [];
+            pass = enabled.length > 0;
+            detail = pass ? `Safe Links aktiveret: ${enabled.map(p=>p.Name).join(', ')}` : 'Ingen Safe Links policy aktiveret';
+          }
+          else if (c.check_id === '2.1.2') {
+            const r = await callExoAdmin('MalwareFilterPolicy?$select=EnableFileFilter,Name');
+            const enabled = r?.value?.filter(p => p.EnableFileFilter) || [];
+            pass = enabled.length > 0;
+            detail = pass ? 'Attachment filter aktiveret' : 'Attachment filter IKKE aktiveret';
+          }
+          else if (c.check_id === '2.1.3') {
+            const r = await callExoAdmin('MalwareFilterPolicy?$select=EnableInternalSenderAdminNotifications,Name');
+            const enabled = r?.value?.filter(p => p.EnableInternalSenderAdminNotifications) || [];
+            pass = enabled.length > 0;
+            detail = pass ? 'Malware notifikationer aktiveret' : 'Malware notifikationer IKKE aktiveret';
+          }
+          else if (c.check_id === '2.1.4') {
+            const r = await callExoAdmin('SafeAttachmentPolicy?$select=Enable,Name');
+            const enabled = r?.value?.filter(p => p.Enable) || [];
+            pass = enabled.length > 0;
+            detail = pass ? `Safe Attachments aktiveret: ${enabled.map(p=>p.Name).join(', ')}` : 'Ingen Safe Attachments policy';
+          }
+          else if (c.check_id === '2.1.5') {
+            const r = await callExoAdmin('AtpPolicyForO365?$select=EnableATPForSPOTeamsODB');
+            pass = r?.value?.[0]?.EnableATPForSPOTeamsODB === true;
+            detail = pass ? 'Safe Attachments for SPO/Teams aktiveret' : 'Safe Attachments for SPO/Teams IKKE aktiveret';
+          }
+          else if (c.check_id === '2.1.6') {
+            const r = await callExoAdmin('HostedContentFilterPolicy?$select=NotifyOutboundSpam,BccSuspiciousOutboundMail,Name');
+            const enabled = r?.value?.filter(p => p.NotifyOutboundSpam || p.BccSuspiciousOutboundMail) || [];
+            pass = enabled.length > 0;
+            detail = pass ? 'Spam notifikationer konfigureret' : 'Ingen spam notifikationer';
+          }
+          else if (c.check_id === '2.1.7') {
+            const r = await callExoAdmin('AntiPhishPolicy?$select=Enabled,Name');
+            const custom = r?.value?.filter(p => p.Enabled && p.Name !== 'Office365 AntiPhish Default') || [];
+            pass = custom.length > 0;
+            detail = pass ? `Custom anti-phishing: ${custom.map(p=>p.Name).join(', ')}` : 'Ingen custom anti-phishing policy';
+          }
+          else if (c.check_id === '2.1.8') {
+            const r = await callExoAdmin('AcceptedDomain?$filter=DomainType eq 2&$select=Name');
+            const domains = r?.value || [];
+            const checks = await Promise.all(domains.map(async d => {
+              const dns = await callReviewGraph(`/domains/${d.Name}/serviceConfigurationRecords`).catch(() => null);
+              const hasSPF = dns?.value?.some(rec => rec.text?.includes('v=spf1'));
+              return { domain: d.Name, hasSPF };
+            }));
+            const missing = checks.filter(c => !c.hasSPF);
+            pass = missing.length === 0;
+            detail = pass ? `SPF OK for alle ${domains.length} domæner` : `Mangler SPF: ${missing.map(c=>c.domain).join(', ')}`;
+          }
+          else if (c.check_id === '2.1.9') {
+            const r = await callExoAdmin('DkimSigningConfig?$select=Enabled,Domain');
+            const enabled = r?.value?.filter(p => p.Enabled) || [];
+            const all = await callExoAdmin('AcceptedDomain?$filter=DomainType eq 2&$select=Name');
+            const allCount = all?.value?.length || 1;
+            pass = enabled.length >= allCount;
+            detail = `DKIM aktiveret for ${enabled.length} af ${allCount} domæner`;
+          }
+          else if (c.check_id === '2.1.10') {
+            const r = await callExoAdmin('AcceptedDomain?$filter=DomainType eq 2&$select=Name');
+            const domains = r?.value || [];
+            const checks = await Promise.all(domains.map(async d => {
+              const dns = await callReviewGraph(`/domains/_dmarc.${d.Name}/serviceConfigurationRecords`).catch(() => null);
+              const hasDMARC = dns?.value?.some(rec => rec.text?.includes('v=DMARC1'));
+              return { domain: d.Name, hasDMARC };
+            }));
+            const missing = checks.filter(c => !c.hasDMARC);
+            pass = missing.length === 0;
+            detail = pass ? 'DMARC OK for alle domæner' : `Mangler DMARC: ${missing.map(c=>c.domain).join(', ')}`;
+          }
+          else if (c.check_id === '2.1.11') {
+            const r = await callExoAdmin("MalwareFilterPolicy?$filter=Name eq Default&$select=FileTypes");
+            const types = r?.value?.[0]?.FileTypes || [];
+            const required = ['exe','bat','cmd','vbs','js','ps1','msi','dll','scr'];
+            const missing = required.filter(t => !types.includes(t));
+            pass = missing.length === 0;
+            detail = pass ? 'Alle kritiske filtyper filtreret' : `Mangler filtrering: ${missing.join(', ')}`;
+          }
+          else if (c.check_id === '2.1.12') {
+            const r = await callExoAdmin("HostedConnectionFilterPolicy?$filter=Name eq Default&$select=IPAllowList");
+            const list = r?.value?.[0]?.IPAllowList || [];
+            pass = list.length === 0;
+            detail = pass ? 'IP allow list er tom' : `${list.length} IPs på allow list`;
+          }
+          else if (c.check_id === '2.1.13') {
+            const r = await callExoAdmin("HostedConnectionFilterPolicy?$filter=Name eq Default&$select=EnableSafeList");
+            pass = r?.value?.[0]?.EnableSafeList === false;
+            detail = pass ? 'Safe list deaktiveret' : 'Safe list AKTIVERET';
+          }
+          else if (c.check_id === '2.1.14') {
+            const r = await callExoAdmin('HostedContentFilterPolicy?$select=AllowedSenderDomains,Name');
+            const withDomains = r?.value?.filter(p => p.AllowedSenderDomains?.length > 0) || [];
+            pass = withDomains.length === 0;
+            detail = pass ? 'Ingen tilladt domæner i anti-spam' : `Tilladt domæner i: ${withDomains.map(p=>p.Name).join(', ')}`;
+          }
+          else if (c.check_id === '2.1.15') {
+            const r = await callExoAdmin('HostedOutboundSpamFilterPolicy?$select=RecipientLimitExternalPerHour,Name');
+            const limited = r?.value?.filter(p => p.RecipientLimitExternalPerHour > 0) || [];
+            pass = limited.length > 0;
+            detail = pass ? 'Udgående besked grænser konfigureret' : 'Ingen udgående besked grænser';
+          }
+          else if (c.check_id === '2.2.1') {
+            pass = null;
+            detail = 'Verificer emergency account monitoring alerts i Defender portal';
+          }
+          else if (c.check_id.startsWith('2.4.')) {
+            pass = null;
+            detail = 'Verificer i Microsoft Defender portal > Settings';
+          }
+          else {
+            pass = null;
+            detail = 'Verificer i Microsoft Defender portal';
+          }
         } else {
         const defenderMap = {
           '2.1.1': { id: 'EnableSafeLinksPolicies', name: 'Safe Links' },
@@ -1528,8 +1676,74 @@ async function runAutomatedReview() {
 
       // ── Section 6: Exchange Admin Center ───────────────────────────────
       else if (c.check_id.startsWith('6.')) {
-        detail = 'Kræver Exchange Online PowerShell - kør PS-scriptet for Exchange checks';
-        pass = null;
+        if (window._psResults?.[c.check_id] !== undefined) {
+          pass = window._psResults[c.check_id].pass;
+          detail = window._psResults[c.check_id].detail;
+        } else if (window._exoToken) {
+          if (c.check_id === '6.1.1') {
+            const r = await callExoAdmin('OrganizationConfig?$select=AuditDisabled');
+            pass = r?.value?.[0]?.AuditDisabled === false;
+            detail = pass ? 'Mailbox auditing aktiveret' : 'Mailbox auditing DEAKTIVERET';
+          } else if (c.check_id === '6.1.2') {
+            const r = await callExoAdmin('Mailbox?$top=5&$select=AuditEnabled');
+            const en = r?.value?.filter(m => m.AuditEnabled)?.length || 0;
+            pass = en > 0;
+            detail = `Mailbox audit: ${en} af ${r?.value?.length || 0} aktiveret`;
+          } else if (c.check_id === '6.1.3') {
+            const r = await callExoAdmin('MailboxAuditBypassAssociation?$filter=AuditBypassEnabled eq true');
+            pass = (r?.value?.length || 0) === 0;
+            detail = pass ? 'Ingen audit bypass' : `${r.value.length} bypass aktiveret`;
+          } else if (c.check_id === '6.2.1') {
+            const r = await callExoAdmin('Mailbox?$filter=ForwardingSmtpAddress ne null&$top=1');
+            pass = (r?.value?.length || 0) === 0;
+            detail = pass ? 'Ingen mail forwarding' : `${r.value.length} mailboxes med forwarding`;
+          } else if (c.check_id === '6.2.2') {
+            const r = await callExoAdmin('TransportRule?$select=SetSCL,Name');
+            const bypass = r?.value?.filter(rule => rule.SetSCL === -1) || [];
+            pass = bypass.length === 0;
+            detail = pass ? 'Ingen whitelist transport regler' : `${bypass.length} regler bypasser spam`;
+          } else if (c.check_id === '6.2.3') {
+            const r = await callExoAdmin('ExternalInOutlook');
+            pass = r?.value?.some(e => e.Enabled === true) || false;
+            detail = pass ? 'Ekstern afsender advarsel aktiveret' : 'IKKE aktiveret';
+          } else if (c.check_id === '6.3.1') {
+            const r = await callExoAdmin('OwaMailboxPolicy?$filter=IsDefault eq true&$select=AddinEnabled');
+            pass = r?.value?.[0]?.AddinEnabled === false;
+            detail = pass ? 'Outlook add-ins deaktiveret' : 'Add-ins aktiveret';
+          } else if (c.check_id === '6.3.2') {
+            const r = await callExoAdmin('OwaMailboxPolicy?$filter=IsDefault eq true&$select=PersonalAccountsEnabled');
+            pass = r?.value?.[0]?.PersonalAccountsEnabled === false;
+            detail = pass ? 'Personlige konti deaktiveret' : 'Personlige konti aktiveret';
+          } else if (c.check_id === '6.5.1') {
+            const r = await callExoAdmin('OrganizationConfig?$select=OAuth2ClientProfileEnabled');
+            pass = r?.value?.[0]?.OAuth2ClientProfileEnabled === true;
+            detail = pass ? 'Modern auth aktiveret' : 'Modern auth IKKE aktiveret';
+          } else if (c.check_id === '6.5.2') {
+            const r = await callExoAdmin('OrganizationConfig?$select=MailTipsAllTipsEnabled,MailTipsExternalRecipientsTipsEnabled');
+            const cfg = r?.value?.[0];
+            pass = cfg?.MailTipsAllTipsEnabled === true && cfg?.MailTipsExternalRecipientsTipsEnabled === true;
+            detail = `MailTips: All=${cfg?.MailTipsAllTipsEnabled}, External=${cfg?.MailTipsExternalRecipientsTipsEnabled}`;
+          } else if (c.check_id === '6.5.3') {
+            const r = await callExoAdmin('OwaMailboxPolicy?$filter=IsDefault eq true&$select=AdditionalStorageProvidersAvailable');
+            pass = r?.value?.[0]?.AdditionalStorageProvidersAvailable === false;
+            detail = pass ? 'Extra storage deaktiveret' : 'Extra storage aktiveret';
+          } else if (c.check_id === '6.5.4') {
+            const r = await callExoAdmin('OrganizationConfig?$select=SmtpClientAuthenticationDisabled');
+            pass = r?.value?.[0]?.SmtpClientAuthenticationDisabled === true;
+            detail = pass ? 'SMTP AUTH deaktiveret' : 'SMTP AUTH aktiveret';
+          } else if (c.check_id === '6.5.5') {
+            const r = await callExoAdmin('ReceiveConnector?$filter=Enabled eq true&$select=PermissionGroups,Name');
+            const anon = r?.value?.filter(c => c.PermissionGroups?.includes('AnonymousUsers')) || [];
+            pass = anon.length === 0;
+            detail = pass ? 'Ingen anonyme connectors' : `${anon.length} anonyme connectors`;
+          } else {
+            pass = null;
+            detail = 'Verificer manuelt i Exchange Admin Center';
+          }
+        } else {
+          pass = null;
+          detail = 'Exchange token ikke tilgængeligt - verificer manuelt';
+        }
       }
 
       // ── Section 7: SharePoint Admin Center ────────────────────────────
