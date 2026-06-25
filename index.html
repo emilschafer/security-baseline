@@ -2470,13 +2470,18 @@ async function downloadLatestReport(customerId, customerName) {
     let meta = {};
     try { meta = JSON.parse(reportItem.Comment || '{}'); } catch(e) {}
     // Support both old and new field names
-    const metaScore = meta.score || meta.s || '';
     const metaNotes = meta.notes || meta.n || '';
     const metaNext = meta.next || meta.nx || '';
+    // Auto-load Secure Score
+    let metaScore = meta.score || meta.s || '';
+    const scoreItem = items.find(i => i.CustomerId === customerId && i.CheckSpId === 'SECURE_SCORE');
+    if (scoreItem?.Comment && !metaScore) {
+      try { const sd = JSON.parse(scoreItem.Comment); if (sd?.pct) metaScore = String(sd.pct); } catch(e) {}
+    }
 
     // Hent assessments for denne kunde
     const custAssessments = {};
-    items.filter(i => i.CustomerId === customerId && i.CheckSpId !== 'LATEST_REPORT')
+    items.filter(i => i.CustomerId === customerId && i.CheckSpId !== 'LATEST_REPORT' && i.CheckSpId !== 'SECURE_SCORE')
       .forEach(i => { custAssessments[i.CheckSpId] = { status: i.Status||'none', comment: i.Comment||'' }; });
 
     // Find customer
