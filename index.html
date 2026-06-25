@@ -1671,23 +1671,26 @@ async function runAutomatedReview() {
       }
       else if (c.check_id.startsWith('5.2.4.')) {
         try {
-          const sspr = await callReviewGraphBeta('/policies/selfServicePasswordResetPolicy').catch(() => null);
+          const sspr = await callReviewGraph('/policies/authenticationMethodsPolicy').catch(() => null);
+          // SSPR settings via Graph - check registrationEnforcement
           if (sspr) {
+            const reg = sspr.registrationEnforcement?.authenticationMethodsRegistrationCampaign;
             if (c.check_id === '5.2.4.1') {
-              pass = sspr.allowedResetAuthenticationMethods?.length > 0 && sspr.registrationRequiredByUsers !== false;
-              detail = `SSPR: ${JSON.stringify(sspr.allowedResetAuthenticationMethods || [])}`;
+              // Check if SSPR is enabled via directory settings
+              pass = null;
+              detail = 'Verificer i Entra > Password reset > Self service password reset enabled = All';
             } else if (c.check_id === '5.2.4.2') {
-              pass = (sspr.numberOfAuthenticationMethodsRequired || 1) >= 2;
-              detail = `Metoder påkrævet: ${sspr.numberOfAuthenticationMethodsRequired || 1} (skal være 2)`;
+              pass = null;
+              detail = 'Verificer i Entra > Password reset > Authentication methods > Number required = 2';
             } else if (c.check_id === '5.2.4.3') {
-              pass = sspr.registrationRequiredByUsers === true;
-              detail = `Registrering påkrævet: ${sspr.registrationRequiredByUsers}`;
+              pass = reg?.state === 'enabled';
+              detail = pass ? 'MFA registrering kampagne aktiveret' : 'Verificer SSPR registrering i Entra > Password reset';
             } else if (c.check_id === '5.2.4.4') {
-              pass = sspr.notifyUsersOnPasswordReset === true;
-              detail = `Notificer brugere: ${sspr.notifyUsersOnPasswordReset}`;
+              pass = null;
+              detail = 'Verificer i Entra > Password reset > Notifications > Notify users = Yes';
             } else if (c.check_id === '5.2.4.5') {
-              pass = sspr.notifyOnAdminPasswordReset === true;
-              detail = `Notificer admins: ${sspr.notifyOnAdminPasswordReset}`;
+              pass = null;
+              detail = 'Verificer i Entra > Password reset > Notifications > Notify all admins = Yes';
             }
           } else {
             pass = null;
@@ -1700,8 +1703,8 @@ async function runAutomatedReview() {
       }
       else if (c.check_id === '5.3.1') {
         try {
-          const eligible = await callReviewGraph('/roleManagement/directory/roleEligibilityScheduleInstances?$top=10&$select=roleDefinitionId,principalId,status').catch(() => null);
-          const active = await callReviewGraph("/roleManagement/directory/roleAssignmentScheduleInstances?$top=10&$select=roleDefinitionId,endDateTime,assignmentType").catch(() => null);
+          const eligible = await callReviewGraphBeta('/roleManagement/directory/roleEligibilityScheduleInstances?$top=10&$select=roleDefinitionId,principalId,status').catch(() => null);
+          const active = await callReviewGraphBeta("/roleManagement/directory/roleAssignmentScheduleInstances?$top=10&$select=roleDefinitionId,endDateTime,assignmentType").catch(() => null);
           const permanentActive = active?.value?.filter(a => !a.endDateTime && a.assignmentType === 'Assigned') || [];
           pass = (eligible?.value?.length || 0) > 0 && permanentActive.length === 0;
           detail = pass
@@ -1716,7 +1719,7 @@ async function runAutomatedReview() {
       }
       else if (c.check_id === '5.3.2' || c.check_id === '5.3.3') {
         try {
-          const reviews = await callReviewGraph('/identityGovernance/accessReviews/definitions?$top=20&$select=displayName,scope,status');
+          const reviews = await callReviewGraphBeta('/identityGovernance/accessReviews/definitions?$top=20&$select=displayName,scope,status');
           const allReviews = reviews?.value || [];
           if (c.check_id === '5.3.2') {
             const guestReviews = allReviews.filter(r => 
@@ -1748,19 +1751,19 @@ async function runAutomatedReview() {
             : 'e8611ab8-c189-46e8-94e1-60213ab1f814';
           const roleName = c.check_id === '5.3.4' ? 'Global Administrator' : 'Privileged Role Administrator';
           
-          const policyAssignment = await callReviewGraph(
+          const policyAssignment = await callReviewGraphBeta(
             `/policies/roleManagementPolicies?$filter=scopeId eq '/' and scopeType eq 'DirectoryRole'&$top=50`
           ).catch(() => null);
           
           if (policyAssignment?.value?.length > 0) {
             // Find policy for this role
-            const assignment = await callReviewGraph(
+            const assignment = await callReviewGraphBeta(
               `/policies/roleManagementPolicyAssignments?$filter=scopeId eq '/' and scopeType eq 'DirectoryRole' and roleDefinitionId eq '${roleId}'`
             ).catch(() => null);
             
             if (assignment?.value?.[0]?.policyId) {
               const policyId = assignment.value[0].policyId;
-              const rules = await callReviewGraph(
+              const rules = await callReviewGraphBeta(
                 `/policies/roleManagementPolicies/${policyId}/rules`
               ).catch(() => null);
               
