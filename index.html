@@ -1037,7 +1037,7 @@ function updateReviewProgress(current, total, checkId) {
 }
 
 
-async function callAzureFunction() {
+async function callAzureFunction(exoToken, teamsToken) {
   if (!APP_CONFIG.azureFunctionUrl) return {};
   try {
     const r = await fetch(APP_CONFIG.azureFunctionUrl, {
@@ -1045,6 +1045,8 @@ async function callAzureFunction() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         accessToken: reviewToken,
+        exoToken: exoToken || reviewToken,
+        teamsToken: teamsToken || reviewToken,
         tenantId: reviewTenantId
       })
     });
@@ -1068,10 +1070,32 @@ async function runAutomatedReview() {
   // Call Azure Function for Exchange/Teams checks in parallel
   window._psResults = {};
   if (APP_CONFIG.azureFunctionUrl) {
-    callAzureFunction().then(r => {
-      window._psResults = r || {};
-      console.log(`Azure Function: ${Object.keys(window._psResults).length} PS resultater`);
-    }).catch(e => console.warn('Azure Function fejlede:', e));
+    (async () => {
+      try {
+        // Get EXO token
+        let exoToken = null;
+        let teamsToken = null;
+        try {
+          const exoResp = await reviewMsalInstance.acquireTokenSilent({
+            scopes: ['https://outlook.office365.com/.default'],
+            account: reviewMsalInstance.getActiveAccount()
+          });
+          exoToken = exoResp.accessToken;
+        } catch(e) { console.warn('EXO token fejl:', e.message); }
+
+        try {
+          const teamsResp = await reviewMsalInstance.acquireTokenSilent({
+            scopes: ['48ac35b8-9aa8-4d74-927d-1f4a14a0b239/.default'],
+            account: reviewMsalInstance.getActiveAccount()
+          });
+          teamsToken = teamsResp.accessToken;
+        } catch(e) { console.warn('Teams token fejl:', e.message); }
+
+        const r = await callAzureFunction(exoToken, teamsToken);
+        window._psResults = r || {};
+        console.log(`Azure Function: ${Object.keys(window._psResults).length} PS resultater`);
+      } catch(e) { console.warn('Azure Function fejlede:', e); }
+    })();
   }
 
   // Pre-fetch Secure Score controls for Exchange/Defender checks
