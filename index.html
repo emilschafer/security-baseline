@@ -980,8 +980,29 @@ async function doReviewLogin() {
     });
     await reviewMsalInstance.initialize();
 
+    // Request admin consent on first login - covers all permissions for the tenant
     const resp = await reviewMsalInstance.loginPopup({
-      scopes: ['https://graph.microsoft.com/.default'],
+      scopes: [
+        'https://graph.microsoft.com/.default',
+        'https://graph.microsoft.com/Directory.Read.All',
+        'https://graph.microsoft.com/Policy.Read.All',
+        'https://graph.microsoft.com/Organization.Read.All',
+        'https://graph.microsoft.com/User.Read.All',
+        'https://graph.microsoft.com/Group.Read.All',
+        'https://graph.microsoft.com/RoleManagement.Read.Directory',
+        'https://graph.microsoft.com/SecurityEvents.Read.All',
+        'https://graph.microsoft.com/SharePointTenantSettings.Read.All',
+        'https://graph.microsoft.com/TeamSettings.Read.All',
+        'https://graph.microsoft.com/Channel.ReadBasic.All',
+        'https://graph.microsoft.com/Team.ReadBasic.All',
+        'https://graph.microsoft.com/TeamsAppInstallation.ReadForUser',
+        'https://graph.microsoft.com/AccessReview.Read.All',
+        'https://graph.microsoft.com/PrivilegedAccess.Read.AzureAD',
+        'https://graph.microsoft.com/AuditLog.Read.All',
+        'https://graph.microsoft.com/Reports.Read.All',
+        'https://graph.microsoft.com/DeviceManagementConfiguration.Read.All',
+        'https://graph.microsoft.com/InformationProtectionPolicy.Read'
+      ],
       prompt: 'select_account'
     });
 
@@ -993,26 +1014,7 @@ async function doReviewLogin() {
     reviewToken = tokenResp.accessToken;
     reviewTenantId = resp.account.tenantId;
 
-    // Also get Exchange Online token
-    try {
-      const exoResp = await reviewMsalInstance.acquireTokenSilent({
-        scopes: ['https://outlook.office365.com/.default'],
-        account: resp.account
-      });
-      window._exoToken = exoResp.accessToken;
-    } catch(e) {
-      // Try popup if silent fails
-      try {
-        const exoResp = await reviewMsalInstance.acquireTokenPopup({
-          scopes: ['https://outlook.office365.com/Exchange.Manage'],
-          account: resp.account
-        });
-        window._exoToken = exoResp.accessToken;
-      } catch(e2) {
-        console.warn('EXO token ikke tilgængeligt:', e2.message);
-        window._exoToken = null;
-      }
-    }
+    window._exoToken = null; // EXO via browser ikke understøttet
 
     showToast(`Logget ind som ${resp.account.username}`, 'success');
     runAutomatedReview();
@@ -1022,14 +1024,9 @@ async function doReviewLogin() {
 }
 
 async function callExoAdmin(endpoint) {
-  if (!window._exoToken) return null;
-  try {
-    const r = await fetch(`https://outlook.office365.com/adminapi/beta/${reviewTenantId}/${endpoint}`, {
-      headers: { 'Authorization': `Bearer ${window._exoToken}`, 'Accept': 'application/json' }
-    });
-    if (!r.ok) return null;
-    return r.json();
-  } catch(e) { return null; }
+  // Exchange Online Admin REST API blokeres af CORS fra browser
+  // Exchange checks køres via Azure Function
+  return null;
 }
 
 async function callReviewGraph(endpoint, method = 'GET', body = null) {
@@ -1115,15 +1112,7 @@ async function runAutomatedReview() {
           exoToken = exoResp.accessToken;
         } catch(e) { console.warn('EXO token fejl:', e.message); }
 
-        try {
-          const teamsResp = await reviewMsalInstance.acquireTokenSilent({
-            scopes: ['48ac35b8-9aa8-4d74-927d-1f4a14a0b239/.default'],
-            account: reviewMsalInstance.getActiveAccount()
-          });
-          teamsToken = teamsResp.accessToken;
-        } catch(e) { console.warn('Teams token fejl:', e.message); }
-
-        const r = await callAzureFunction(exoToken, teamsToken);
+        const r = await callAzureFunction(null, null);
         window._psResults = r || {};
         console.log(`Azure Function: ${Object.keys(window._psResults).length} PS resultater`);
       } catch(e) { console.warn('Azure Function fejlede:', e); }
