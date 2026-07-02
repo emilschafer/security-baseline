@@ -980,29 +980,9 @@ async function doReviewLogin() {
     });
     await reviewMsalInstance.initialize();
 
-    // Request admin consent on first login - covers all permissions for the tenant
+    // .default scope giver alle tilladte permissions i ét kald
     const resp = await reviewMsalInstance.loginPopup({
-      scopes: [
-        'https://graph.microsoft.com/.default',
-        'https://graph.microsoft.com/Directory.Read.All',
-        'https://graph.microsoft.com/Policy.Read.All',
-        'https://graph.microsoft.com/Organization.Read.All',
-        'https://graph.microsoft.com/User.Read.All',
-        'https://graph.microsoft.com/Group.Read.All',
-        'https://graph.microsoft.com/RoleManagement.Read.Directory',
-        'https://graph.microsoft.com/SecurityEvents.Read.All',
-        'https://graph.microsoft.com/SharePointTenantSettings.Read.All',
-        'https://graph.microsoft.com/TeamSettings.Read.All',
-        'https://graph.microsoft.com/Channel.ReadBasic.All',
-        'https://graph.microsoft.com/Team.ReadBasic.All',
-        'https://graph.microsoft.com/TeamsAppInstallation.ReadForUser',
-        'https://graph.microsoft.com/AccessReview.Read.All',
-        'https://graph.microsoft.com/PrivilegedAccess.Read.AzureAD',
-        'https://graph.microsoft.com/AuditLog.Read.All',
-        'https://graph.microsoft.com/Reports.Read.All',
-        'https://graph.microsoft.com/DeviceManagementConfiguration.Read.All',
-        'https://graph.microsoft.com/InformationProtectionPolicy.Read'
-      ],
+      scopes: ['https://graph.microsoft.com/.default'],
       prompt: 'select_account'
     });
 
