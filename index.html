@@ -954,6 +954,13 @@ let reviewTenantId = null;
 function startReview(customerId, customerName) {
   reviewCustomerId = customerId;
   reviewCustomerName = customerName;
+  // Clear previous session so we always login fresh for each customer
+  reviewToken = null;
+  reviewTenantId = null;
+  reviewMsalInstance = null;
+  window._secureScoreControls = [];
+  window._currentSecureScore = null;
+  window._psResults = {};
   document.getElementById('review-customer-name').textContent = customerName;
   document.getElementById('review-login-step').style.display = '';
   document.getElementById('review-progress-step').style.display = 'none';
@@ -976,7 +983,7 @@ async function doReviewLogin() {
         authority: 'https://login.microsoftonline.com/organizations',
         redirectUri: window.location.origin + '/blank.html'
       },
-      cache: { cacheLocation: 'sessionStorage' }
+      cache: { cacheLocation: 'memoryStorage' }
     });
     await reviewMsalInstance.initialize();
 
