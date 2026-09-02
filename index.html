@@ -639,6 +639,16 @@ body { font-family: 'DM Sans', system-ui, sans-serif; background: var(--bg); col
 .tag-e5 { background: #f5f3ff; color: #6d28d9; border: 1px solid #ddd6fe; }
 .tag-auto { background: var(--green-bg); color: var(--green); border: 1px solid var(--green-border); }
 .tag-manual { background: var(--amber-bg); color: var(--amber); border: 1px solid var(--amber-border); }
+.badge-risk-critical { background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }
+.badge-risk-high { background: #fff7ed; color: #c2410c; border: 1px solid #fed7aa; }
+.badge-risk-medium { background: #fffbeb; color: #b45309; border: 1px solid #fde68a; }
+.badge-risk-low { background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; }
+.badge-impact-high { background: #eef2ff; color: #4338ca; border: 1px solid #c7d2fe; }
+.badge-impact-medium { background: #f0f9ff; color: #0369a1; border: 1px solid #bae6fd; }
+.badge-impact-low { background: #f8fafc; color: #475569; border: 1px solid #e2e8f0; }
+.rating-row { display: flex; gap: 8px; margin-bottom: 12px; }
+.rating-chip { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 6px; letter-spacing: .02em; }
+.rating-chip .rating-label { font-weight: 500; opacity: .75; text-transform: uppercase; font-size: 9px; letter-spacing: .05em; }
 .status-pill { font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 99px; flex-shrink: 0; white-space: nowrap; }
 .s-none { background: var(--bg2); color: var(--text3); border: 1px solid var(--border); }
 .s-implemented { background: var(--green-bg); color: var(--green); border: 1px solid var(--green-border); }
@@ -994,12 +1004,10 @@ async function doReviewLogin() {
     });
 
     reviewMsalInstance.setActiveAccount(resp.account);
-    const tokenResp = await reviewMsalInstance.acquireTokenSilent({
-      scopes: ['https://graph.microsoft.com/.default'],
-      account: resp.account
-    });
-    reviewToken = tokenResp.accessToken;
+    reviewToken = resp.accessToken;
     reviewTenantId = resp.account.tenantId;
+    console.log('Review token tenant:', reviewTenantId);
+    console.log('Review account:', resp.account.username);
 
     window._exoToken = null; // EXO via browser ikke understøttet
 
@@ -1193,9 +1201,20 @@ async function runAutomatedReview() {
         pass = null;
       }
       else if (c.check_id === '1.3.1') {
-        const pwdPolicies = orgData?.value?.[0]?.passwordPolicies || '';
-        pass = pwdPolicies.includes('DisablePasswordExpiration');
-        detail = pass ? 'Password udløb deaktiveret' : 'Password udløb er aktiveret';
+        try {
+          const domains = await callReviewGraph('/domains?$select=passwordValidityPeriodInDays,id');
+          const neverExpire = domains?.value?.every(d =>
+            d.passwordValidityPeriodInDays === 2147483647 ||
+            d.passwordValidityPeriodInDays === null ||
+            d.passwordValidityPeriodInDays === 0
+          );
+          const orgPwdPolicy = orgData?.value?.[0]?.passwordPolicies || '';
+          pass = neverExpire || orgPwdPolicy.includes('DisablePasswordExpiration');
+          detail = pass ? 'Password udløb deaktiveret (never expire)' : 'Password udløb er aktiveret';
+        } catch(e) {
+          pass = null;
+          detail = 'Verificer i M365 Admin Center > Settings > Security & privacy > Password expiration policy';
+        }
       }
       else if (c.check_id === '1.3.2') {
         const timeout = await callReviewGraph('/policies/activityBasedTimeoutPolicies');
@@ -1679,8 +1698,8 @@ async function runAutomatedReview() {
       }
       else if (c.check_id === '5.3.1') {
         try {
-          const eligible = await callReviewGraphBeta('/roleManagement/directory/roleEligibilityScheduleInstances?$top=10&$select=roleDefinitionId,principalId,status').catch(() => null);
-          const active = await callReviewGraphBeta("/roleManagement/directory/roleAssignmentScheduleInstances?$top=10&$select=roleDefinitionId,endDateTime,assignmentType").catch(() => null);
+          const eligible = await callReviewGraph('/roleManagement/directory/roleEligibilityScheduleInstances?$top=10&$select=roleDefinitionId,principalId,status').catch(() => null);
+          const active = await callReviewGraph("/roleManagement/directory/roleAssignmentScheduleInstances?$top=10&$select=roleDefinitionId,endDateTime,assignmentType").catch(() => null);
           const permanentActive = active?.value?.filter(a => !a.endDateTime && a.assignmentType === 'Assigned') || [];
           pass = (eligible?.value?.length || 0) > 0 && permanentActive.length === 0;
           detail = pass
@@ -1727,7 +1746,7 @@ async function runAutomatedReview() {
             : 'e8611ab8-c189-46e8-94e1-60213ab1f814';
           const roleName = c.check_id === '5.3.4' ? 'Global Administrator' : 'Privileged Role Administrator';
           
-          const policyAssignment = await callReviewGraphBeta(
+          const policyAssignment = await callReviewGraph(
             `/policies/roleManagementPolicies?$filter=scopeId eq '/' and scopeType eq 'DirectoryRole'&$top=50`
           ).catch(() => null);
           
@@ -2370,6 +2389,8 @@ async function loadChecksFromFile() {
     description: c.description || '',
     rationale: c.rationale || '',
     impact: c.impact || '',
+    risk_level: c.risk_level || 'Medium',
+    impact_level: c.impact_level || 'Medium',
     audit_ui: c.audit_ui || [],
     audit_ps: c.audit_ps || '',
     remediation: c.remediation || [],
@@ -2613,7 +2634,13 @@ function renderCard(c) {
   }).join('');
   var tabContent = '';
   if(activeTab === 'overview') {
-    tabContent = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;"><div><div class="section-label">Beskrivelse</div><div class="section-content">'+desc+'</div></div><div>'+(c.rationale?'<div style="margin-bottom:12px;"><div class="section-label">Rationale</div><div class="section-content">'+c.rationale+'</div></div>':'')+(c.impact?'<div><div class="section-label">Impact</div><div class="section-content">'+impact+'</div></div>':'')+'</div></div>';
+    var riskLevel = c.risk_level || 'Medium';
+    var impactLevel = c.impact_level || 'Medium';
+    var ratingRow = '<div class="rating-row">'
+      + '<span class="rating-chip badge-risk-'+riskLevel.toLowerCase()+'"><span class="rating-label">Risk</span> '+riskLevel+'</span>'
+      + '<span class="rating-chip badge-impact-'+impactLevel.toLowerCase()+'"><span class="rating-label">Impact</span> '+impactLevel+' impact</span>'
+      + '</div>';
+    tabContent = ratingRow+'<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;"><div><div class="section-label">Beskrivelse</div><div class="section-content">'+desc+'</div></div><div>'+(c.rationale?'<div style="margin-bottom:12px;"><div class="section-label">Rationale</div><div class="section-content">'+c.rationale+'</div></div>':'')+(c.impact?'<div><div class="section-label">Impact-beskrivelse</div><div class="section-content">'+impact+'</div></div>':'')+'</div></div>';
   } else if(activeTab === 'audit') {
     var psBlock = c.audit_ps ? '<div style="background:var(--surface2);border:0.5px solid var(--border);border-radius:var(--radius);padding:10px 12px;font-family:monospace;font-size:11px;color:var(--text2);line-height:1.6;overflow-x:auto;white-space:pre-wrap;margin-top:5px;">'+psEscaped+'</div>' : '<div style="color:var(--text3);font-size:13px;margin-top:5px;">Ingen PowerShell-procedure</div>';
     tabContent = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;"><div><div class="section-label">UI-procedure</div><ol class="audit-list" style="margin-top:5px;">'+auditUIItems+'</ol></div><div><div class="section-label">PowerShell</div>'+psBlock+'</div></div>';
