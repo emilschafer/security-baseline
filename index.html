@@ -2861,6 +2861,8 @@ async function generatePDFWithMeta(score, noteConstraints, noteNext) {
     });
     const statusColors={implemented:[22,163,74],accepted:[37,99,235],review:[217,119,6],declined:[220,38,38],none:[156,163,175]};
     const statusLabels={implemented:'Implemented',accepted:'Accepted',review:'Under review',declined:'Declined',none:'Ikke vurderet'};
+    const riskColors={Critical:[185,28,28],High:[194,65,12],Medium:[180,83,9],Low:[21,128,61]};
+    const impactColors={High:[67,56,202],Medium:[3,105,161],Low:[71,85,105]};
 
     for(const [secName, secChecks] of Object.entries(sections)) {
       chk(12);
@@ -2880,9 +2882,21 @@ async function generatePDFWithMeta(score, noteConstraints, noteNext) {
         doc.setFillColor(...color);doc.rect(ml,y,3,cardH,'F');
         doc.setFontSize(7.5);doc.setFont('helvetica','bold');doc.setTextColor(107,114,128);
         doc.text(c.check_id,ml+6,y+4.5);
-        const tl=doc.splitTextToSize(c.title,cw-68);
+        const tl=doc.splitTextToSize(c.title,cw-96);
         doc.setTextColor(17,24,39);doc.text(tl[0],ml+20,y+4.5);
         doc.setTextColor(...color);doc.text(statusLabels[status],pw-mr-2,y+4.5,{align:'right'});
+        // Risk / Impact badges
+        const riskLevel = c.risk_level || 'Medium';
+        const impactLevel = c.impact_level || 'Medium';
+        doc.setFontSize(6.5);doc.setFont('helvetica','bold');
+        const riskTxt = 'RISK: '+riskLevel.toUpperCase();
+        const impactTxt = 'IMPACT: '+impactLevel.toUpperCase();
+        const riskW = doc.getTextWidth(riskTxt)+3;
+        const impactW = doc.getTextWidth(impactTxt)+3;
+        doc.setTextColor(...(riskColors[riskLevel]||[107,114,128]));
+        doc.text(riskTxt, pw-mr-2-impactW-3, y+8.3, {align:'left'});
+        doc.setTextColor(...(impactColors[impactLevel]||[107,114,128]));
+        doc.text(impactTxt, pw-mr-2, y+8.3, {align:'right'});
         doc.setFontSize(7);doc.setFont('helvetica','normal');doc.setTextColor(156,163,175);
         if(c.profiles?.length) doc.text(c.profiles.join(' · '),ml+20,y+8.5);
         if(comment){doc.setFontSize(7.5);doc.setTextColor(75,85,99);doc.setFont('helvetica','italic');doc.text(commentLines,ml+6,y+13);}
