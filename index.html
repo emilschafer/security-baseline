@@ -2894,7 +2894,7 @@ async function generatePDFWithMeta(score, noteConstraints, noteNext) {
         const riskW = doc.getTextWidth(riskTxt)+3;
         const impactW = doc.getTextWidth(impactTxt)+3;
         doc.setTextColor(...(riskColors[riskLevel]||[107,114,128]));
-        doc.text(riskTxt, pw-mr-2-impactW-3, y+8.3, {align:'left'});
+        doc.text(riskTxt, pw-mr-2-impactW-5, y+8.3, {align:'right'});
         doc.setTextColor(...(impactColors[impactLevel]||[107,114,128]));
         doc.text(impactTxt, pw-mr-2, y+8.3, {align:'right'});
         doc.setFontSize(7);doc.setFont('helvetica','normal');doc.setTextColor(156,163,175);
