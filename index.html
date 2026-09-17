@@ -25859,20 +25859,107 @@ const REPORT_LABELS = {
   da: {
     title: 'Security Baseline Rapport', customer: 'Kunde', generated: 'Genereret', overallStatus: 'SAMLET STATUS',
     secureScore: 'SECURE SCORE', assessed: 'vurderet', notes: 'Noter', nextSteps: 'Næste skridt',
-    licenseSection: 'Licensvurdering', topCriticalTitle: 'Top 10 — Kritiske punkter der bør prioriteres',
-    topGoodTitle: 'Top 10 — Allerede godt på plads', area: 'OMRÅDE', control: 'CIS KONTROL', risk: 'RISK', impact: 'IMPACT',
+    licenseSection: 'Licensvurdering',
+    area: 'OMRÅDE', control: 'CIS KONTROL', risk: 'RISK', impact: 'IMPACT',
     discussedWith: 'DISKUTERET MED', statusLabels: { implemented:'Implementeret', accepted:'Accepteret', review:'Under review', declined:'Afvist', none:'Ikke vurderet' },
-    noComment: 'Ingen kommentarer endnu.', noDescription: 'Ingen beskrivelse tilgængelig.', noLicense: 'Ingen licensvurdering angivet.'
+    noComment: 'Ingen kommentarer endnu.', noDescription: 'Ingen beskrivelse tilgængelig.', noLicense: 'Ingen licensvurdering angivet.',
+    toc: 'Indholdsfortegnelse',
+    secOverview: 'Overview', secScope: 'Scope', secMethodology: 'Methodology', secAreas: 'Areas for Improvement',
+    secFindings: 'Findings', secKeyFindings: 'Key Findings', secRecommendations: 'Strategic Recommendations', secConclusion: 'Conclusion',
+    riskChartTitle: 'Kontrolpunkter fordelt efter risikoniveau',
+    impactRankingsTitle: 'IMPACT RANKINGS',
+    findingsIntro: 'Dette afsnit gennemgår de identificerede fund og deres potentielle konsekvens for organisationens sikkerhedsniveau. Det beskriver hvor forbedringer anbefales, og hvor der bør implementeres kontroller for at reducere risiko effektivt.',
+    keyFindingsIntro: 'Herunder følger de vigtigste fund fra gennemgangen — de punkter der har størst potentiel konsekvens hvis de ikke adresseres.',
+    recommendationsIntro: 'Baseret på de identificerede fund anbefales følgende tiltag prioriteret efter risiko.',
+    conclusionText: 'Denne rapport giver et samlet billede af sikkerhedstilstanden i Microsoft 365-miljøet, vurderet op mod CIS Microsoft 365 Foundations Benchmark. De identificerede fund og anbefalinger bør danne grundlag for en prioriteret handlingsplan. ADDvision anbefaler løbende opfølgning og genvurdering, i takt med at både organisationen og trusselsbilledet udvikler sig.',
+    implementAction: 'Implementér',
+    noAreasFound: 'Ingen kritiske forbedringspunkter fundet — alt væsentligt er på plads.'
   },
   en: {
     title: 'Security Baseline Report', customer: 'Customer', generated: 'Generated', overallStatus: 'OVERALL STATUS',
     secureScore: 'SECURE SCORE', assessed: 'assessed', notes: 'Notes', nextSteps: 'Next steps',
-    licenseSection: 'License Assessment', topCriticalTitle: 'Top 10 — Critical Points to Prioritize',
-    topGoodTitle: 'Top 10 — Already in Good Shape', area: 'AREA', control: 'CIS CONTROL', risk: 'RISK', impact: 'IMPACT',
+    licenseSection: 'License Assessment',
+    area: 'AREA', control: 'CIS CONTROL', risk: 'RISK', impact: 'IMPACT',
     discussedWith: 'DISCUSSED WITH', statusLabels: { implemented:'Implemented', accepted:'Accepted', review:'Under review', declined:'Declined', none:'Not assessed' },
-    noComment: 'No comments yet.', noDescription: 'No description available.', noLicense: 'No license assessment provided.'
+    noComment: 'No comments yet.', noDescription: 'No description available.', noLicense: 'No license assessment provided.',
+    toc: 'Table of Contents',
+    secOverview: 'Overview', secScope: 'Scope', secMethodology: 'Methodology', secAreas: 'Areas for Improvement',
+    secFindings: 'Findings', secKeyFindings: 'Key Findings', secRecommendations: 'Strategic Recommendations', secConclusion: 'Conclusion',
+    riskChartTitle: 'Controls by Risk Level',
+    impactRankingsTitle: 'IMPACT RANKINGS',
+    findingsIntro: 'This section provides a detailed overview of the identified findings and their potential impact on the organization\u2019s security posture. It outlines where improvements are recommended and where controls should be implemented to mitigate risk effectively.',
+    keyFindingsIntro: 'The following are the most significant findings from this review — the points with the greatest potential impact if left unaddressed.',
+    recommendationsIntro: 'Based on the findings identified, the following actions are recommended, prioritized by risk.',
+    conclusionText: 'This report provides an overall picture of the security posture of the Microsoft 365 environment, assessed against the CIS Microsoft 365 Foundations Benchmark. The findings and recommendations identified should form the basis of a prioritized action plan. ADDvision recommends ongoing follow-up and reassessment as both the organization and the threat landscape evolve.',
+    implementAction: 'Implement',
+    noAreasFound: 'No critical improvement points found — everything essential is in place.'
   }
 };
+
+const SCOPE_DOMAINS = {
+  da: [
+    ['Adgangskontrol', 'Vurdering af mekanismer til at styre og begrænse adgang til ressourcer i organisationens digitale miljø.'],
+    ['Identitet og autentificering', 'Gennemgang af multifaktor-login og adgangspolitikker for at forhindre uautoriseret adgang.'],
+    ['Enhedssikkerhed', 'Vurdering af sikkerhedspolitikker for computere og mobile enheder der tilgår virksomhedens data.'],
+    ['E-mail og samarbejde', 'Gennemgang af beskyttelse mod phishing, spam og malware i Exchange, Teams og SharePoint.'],
+    ['Ekstern deling og gæsteadgang', 'Vurdering af hvordan data deles med eksterne parter og hvordan gæsteadgang styres.'],
+    ['Auditlog og overvågning', 'Gennemgang af logning og sporbarhed af aktiviteter i miljøet.'],
+    ['Databeskyttelse', 'Analyse af foranstaltninger mod uautoriseret videregivelse af følsomme oplysninger.'],
+    ['Administrative rettigheder', 'Vurdering af hvordan privilegerede roller tildeles og kontrolleres.'],
+    ['Sikker baseline', 'Vurdering af organisationens efterlevelse af anerkendte sikkerhedsstandarder (CIS Microsoft 365 Foundations Benchmark).'],
+  ],
+  en: [
+    ['Access Control', 'Evaluation of the mechanisms in place to manage and restrict access to resources within the organization\u2019s digital environment.'],
+    ['Identity & Authentication', 'Review of multi-factor login and access policies to prevent unauthorized access.'],
+    ['Device Security', 'Assessment of security policies for computers and mobile devices accessing corporate data.'],
+    ['Email & Collaboration', 'Review of protection against phishing, spam, and malware across Exchange, Teams, and SharePoint.'],
+    ['External Sharing & Guest Access', 'Evaluation of how data is shared with external parties and how guest access is governed.'],
+    ['Audit Logging & Monitoring', 'Review of logging and traceability of activity across the environment.'],
+    ['Data Protection', 'Analysis of measures against unauthorized disclosure of sensitive information.'],
+    ['Administrative Privileges', 'Assessment of how privileged roles are assigned and controlled.'],
+    ['Secure Baseline', 'Assessment of the organization\u2019s adherence to recognized security standards (CIS Microsoft 365 Foundations Benchmark).'],
+  ]
+};
+
+const METHODOLOGY_STEPS = {
+  da: [
+    ['Kontrol- og konfigurationsanalyse', 'En grundig gennemgang af de indbyggede sikkerhedsindstillinger i Microsoft 365-miljøet, kontrolpunkt for kontrolpunkt.'],
+    ['Identifikation af eksponering og fejlkonfiguration', 'Vurderingen har til formål at afdække fejlkonfigurationer der kan udgøre en sikkerhedsrisiko, gennem analyse af indstillinger, tilladelser og adgangskontroller.'],
+    ['Benchmarking mod CIS Microsoft 365 Foundations Benchmark', 'Hvert kontrolpunkt er vurderet op mod den anerkendte CIS-standard (v7.0.0), som er internationalt anvendt til sikker konfiguration af Microsoft 365.'],
+    ['Automatiseret og manuel verifikation', 'Hvor det er muligt, verificeres kontrolpunkter automatisk via Microsoft Graph API. Punkter der kræver menneskelig vurdering — fx forretningsmæssig kontekst — gennemgås manuelt.'],
+  ],
+  en: [
+    ['Control and Configuration Analysis', 'A thorough review of the built-in security settings within the Microsoft 365 environment, control by control.'],
+    ['Exposure and Misconfiguration Identification', 'The assessment aims to uncover misconfigurations that could pose a security risk, through analysis of settings, permissions, and access controls.'],
+    ['Benchmarking Against the CIS Microsoft 365 Foundations Benchmark', 'Each control is assessed against the recognized CIS standard (v7.0.0), which is used internationally for secure Microsoft 365 configuration.'],
+    ['Automated and Manual Verification', 'Where possible, controls are verified automatically via the Microsoft Graph API. Points requiring human judgment — such as business context — are reviewed manually.'],
+  ]
+};
+
+const IMPACT_RANKING_DEFS = {
+  da: [
+    ['CRITICAL', 'Kritiske fund udgør sårbarheder eller fejlkonfigurationer med potentielt katastrofal konsekvens for fortrolighed, integritet eller tilgængelighed af organisationens digitale aktiver. Disse kræver øjeblikkelig handling.'],
+    ['HIGH', 'Fund med høj risiko udgør sårbarheder med betydelig potentiel konsekvens. Disse kræver hurtig handling for at forhindre kompromittering.'],
+    ['MEDIUM', 'Fund med middel risiko indikerer sårbarheder med moderat potentiel konsekvens. De er ikke lige så kritiske, men bør adresseres for at styrke det samlede sikkerhedsniveau.'],
+    ['LOW', 'Fund med lav risiko har begrænset potentiel konsekvens og lavere sandsynlighed for udnyttelse. De bør stadig adresseres som en del af det løbende sikkerhedsarbejde.'],
+  ],
+  en: [
+    ['CRITICAL', 'Critical-impact findings represent vulnerabilities or misconfigurations with a potentially catastrophic impact on the confidentiality, integrity, or availability of the organization\u2019s digital assets. These require immediate action.'],
+    ['HIGH', 'High-impact findings represent vulnerabilities with significant potential impact. These require prompt action to prevent compromise.'],
+    ['MEDIUM', 'Medium-impact findings indicate vulnerabilities with moderate potential impact. While not as critical, these should be addressed to strengthen the overall security posture.'],
+    ['LOW', 'Low-impact findings carry limited potential impact and a lower likelihood of exploitation. They should still be addressed as part of ongoing security efforts.'],
+  ]
+};
+
+const OVERVIEW_TEXT = {
+  da: 'Denne Security Baseline-rapport giver en dybdegående analyse af sikkerhedstilstanden i {CUSTOMER}s Microsoft 365-miljø, med fokus på Entra ID, Exchange Online, SharePoint, OneDrive og Teams. Vurderingen er foretaget op mod CIS Microsoft 365 Foundations Benchmark v7.0.0 og omfatter en gennemgang af Conditional Access-politikker, compliance-indstillinger og generel sikkerhedskonfiguration. Formålet er at identificere potentielle risici og sårbarheder samt anbefale kontroller der beskytter fortroligheden, integriteten og tilgængeligheden af organisationens digitale aktiver.\n\nRapporten giver indsigt i sikkerhedstilstanden på tværs af centrale områder — herunder adgangsstyring, auditlog og databeskyttelse — og understreger vigtigheden af en proaktiv tilgang til Microsoft 365-sikkerhed. De efterfølgende fund og anbefalinger danner grundlag for velinformerede beslutninger og en effektiv, prioriteret handlingsplan.',
+  en: 'This Security Baseline Report provides an in-depth analysis of the security posture of {CUSTOMER}\u2019s Microsoft 365 environment, focusing on Entra ID, Exchange Online, SharePoint, OneDrive, and Teams. The assessment is conducted against the CIS Microsoft 365 Foundations Benchmark v7.0.0 and includes a review of Conditional Access policies, compliance settings, and overall security configuration. The objective is to identify potential risks and vulnerabilities and to recommend controls that protect the confidentiality, integrity, and availability of the organization\u2019s digital assets.\n\nThe report provides insight into the security posture across key domains — including access control, audit logging, and data protection — and underscores the importance of a proactive approach to Microsoft 365 security. The findings and recommendations that follow form the basis for informed decision-making and an effective, prioritized action plan.'
+};
+
+function computeAreasForImprovement(checksArr, assessmentsObj, count) {
+  const { critical } = computeTopLists(checksArr, assessmentsObj);
+  return critical.slice(0, count || 5);
+}
 
 function computeTopLists(checksArr, assessmentsObj) {
   const riskOrder = { Critical:4, High:3, Medium:2, Low:1 };
@@ -25956,29 +26043,93 @@ async function generateWordReport(score, noteConstraints, noteNext, lang, licens
     if (noteConstraints) children.push(new Paragraph({ spacing:{after:40}, children:[txt(`${L.notes}: `,{bold:true,size:17,color:'92400E'}), txt(noteConstraints,{size:17,color:'5C2B0C'})] }));
     if (noteNext) children.push(new Paragraph({ spacing:{after:200}, children:[txt(`${L.nextSteps}: `,{bold:true,size:17,color:'1E40AF'}), txt(noteNext,{size:17,color:COLOR_PRIMARY})] }));
 
-    // License section
-    children.push(new Paragraph({ spacing:{before:100,after:80}, children:[txt(L.licenseSection,{size:24,bold:true,color:COLOR_PRIMARY})] }));
-    children.push(new Paragraph({ spacing:{after:200}, children:[txt(licenseText ? licenseText : L.noLicense, {size:18, italics: !licenseText, color: licenseText ? COLOR_DARK : COLOR_GRAY})] }));
-
-    // Top 10 lists
-    const { critical: topCritical, good: topGood } = computeTopLists(checks, assessments);
-    function renderTopList(title, items, color) {
-      children.push(new Paragraph({ spacing:{before:100,after:80}, children:[txt(title,{size:22,bold:true,color})] }));
-      if (items.length === 0) {
-        children.push(new Paragraph({ spacing:{after:120}, children:[txt(lang==='en' ? 'No matching items.' : 'Ingen punkter fundet.', {size:17, italics:true, color:COLOR_GRAY})] }));
-      } else {
-        items.forEach((c, idx) => {
-          children.push(new Paragraph({ spacing:{after:60}, children:[
-            txt(`${idx+1}. `,{bold:true,size:18,color}),
-            txt(`${c.check_id}  `,{bold:true,size:18,color:COLOR_ACCENT}),
-            txt(c.title||'',{size:18})
-          ]}));
-        });
-      }
+    // ── Table of Contents (Word auto-updates page numbers) ──
+    children.push(new Paragraph({ pageBreakBefore: true, heading: HeadingLevel.HEADING_1, spacing:{after:200}, children:[txt(L.toc,{size:30,bold:true,color:COLOR_DARK})] }));
+    const { TableOfContents } = docx;
+    if (TableOfContents) {
+      children.push(new TableOfContents(L.toc, { hyperlink: true, headingStyleRange: '1-1' }));
     }
-    renderTopList(L.topCriticalTitle, topCritical, 'B91C1C');
-    renderTopList(L.topGoodTitle, topGood, '16A34A');
-    children.push(new Paragraph({ spacing:{after:100} }));
+
+    function h1(text) { return new Paragraph({ pageBreakBefore:true, heading: HeadingLevel.HEADING_1, spacing:{after:160}, children:[txt(text,{size:28,bold:true,color:COLOR_PRIMARY})] }); }
+    function h2(text) { return new Paragraph({ spacing:{before:140,after:80}, children:[txt(text,{size:22,bold:true,color:COLOR_DARK})] }); }
+    function bodyP(text, opts={}) { return new Paragraph({ spacing:{after:120}, children:[txt(text,{size:18,...opts})] }); }
+
+    // ── OVERVIEW ──
+    children.push(h1(L.secOverview));
+    const overviewTextW = (OVERVIEW_TEXT[lang]||OVERVIEW_TEXT.da).replace(/\{CUSTOMER\}/g, custName);
+    overviewTextW.split('\n\n').forEach(p => children.push(bodyP(p)));
+
+    children.push(h2(L.licenseSection));
+    children.push(bodyP(licenseText ? licenseText : L.noLicense, { italics: !licenseText, color: licenseText?COLOR_DARK:COLOR_GRAY }));
+
+    // Risk distribution chart (as a simple colored table since docx has no native bar chart)
+    children.push(h2(L.riskChartTitle));
+    const riskCountsW = {Critical:0,High:0,Medium:0,Low:0};
+    checks.forEach(c=>{ riskCountsW[c.risk_level||'Medium']++; });
+    const barColorsHex = {Critical:'B91C1C',High:'EA580C',Medium:'D97706',Low:'2563EB'};
+    const maxRiskCountW = Math.max(...Object.values(riskCountsW),1);
+    ['Critical','High','Medium','Low'].forEach(level=>{
+      const count = riskCountsW[level];
+      const pctW = Math.round((count/maxRiskCountW)*100);
+      children.push(new Table({
+        width:{size:100,type:WidthType.PERCENTAGE},
+        borders:{top:{style:BorderStyle.NONE},bottom:{style:BorderStyle.NONE},left:{style:BorderStyle.NONE},right:{style:BorderStyle.NONE},insideHorizontal:{style:BorderStyle.NONE},insideVertical:{style:BorderStyle.NONE}},
+        rows:[new TableRow({children:[
+          new TableCell({width:{size:12,type:WidthType.PERCENTAGE},margins:{top:40,bottom:40},children:[new Paragraph({children:[txt(level,{size:17,bold:true})]})]}),
+          new TableCell({width:{size:78,type:WidthType.PERCENTAGE},margins:{top:40,bottom:40},shading:{fill:'F3F4F6',type:ShadingType.CLEAR},children:[new Paragraph({children:[
+            new TextRun({text:'\u2588'.repeat(Math.max(Math.round(pctW/3),1)), color:barColorsHex[level], size:15, font:'Calibri'})
+          ]})]}),
+          new TableCell({width:{size:10,type:WidthType.PERCENTAGE},margins:{top:40,bottom:40},children:[new Paragraph({children:[txt(String(count),{size:17,bold:true})]})]}),
+        ]})]
+      }));
+    });
+    children.push(new Paragraph({spacing:{after:200}}));
+
+    // ── SCOPE ──
+    children.push(h1(L.secScope));
+    (SCOPE_DOMAINS[lang]||SCOPE_DOMAINS.da).forEach(([title,desc])=>{
+      children.push(new Paragraph({spacing:{after:100},children:[txt(title+'. ',{bold:true,size:18}),txt(desc,{size:18})]}));
+    });
+
+    // ── METHODOLOGY ──
+    children.push(h1(L.secMethodology));
+    (METHODOLOGY_STEPS[lang]||METHODOLOGY_STEPS.da).forEach(([title,desc],idx)=>{
+      children.push(new Paragraph({spacing:{after:100},children:[txt(`${idx+1}. ${title}. `,{bold:true,size:18}),txt(desc,{size:18})]}));
+    });
+
+    // ── AREAS FOR IMPROVEMENT ──
+    children.push(h1(L.secAreas));
+    const areasListW = computeAreasForImprovement(checks, assessments, 5);
+    if (areasListW.length===0) {
+      children.push(bodyP(L.noAreasFound, {italics:true,color:COLOR_GRAY}));
+    } else {
+      areasListW.forEach((c,idx)=>{
+        const riskLevel = c.risk_level||'Medium';
+        children.push(new Paragraph({spacing:{after:100},children:[
+          txt(`${idx+1}. ${c.check_id} — ${c.title||''}   `,{bold:true,size:18}),
+          txt(riskLevel.toUpperCase(),{bold:true,size:16,color:riskColors[riskLevel]||riskColors.Medium})
+        ]}));
+      });
+    }
+    children.push(h2(L.impactRankingsTitle));
+    IMPACT_RANKING_DEFS[lang||'da'].forEach(([label,def])=>{
+      children.push(new Paragraph({spacing:{after:100},children:[
+        txt(label+': ',{bold:true,size:18,color:riskColors[label.charAt(0)+label.slice(1).toLowerCase()]||COLOR_DARK}),
+        txt(def,{size:18})
+      ]}));
+    });
+
+    // ── FINDINGS ──
+    children.push(h1(L.secFindings));
+    children.push(bodyP(L.findingsIntro));
+    children.push(h2(L.secKeyFindings));
+    children.push(bodyP(L.keyFindingsIntro));
+    areasListW.forEach((c,idx)=>{
+      const explain = c.impact_short || c.rationale_short || '';
+      children.push(new Paragraph({spacing:{after:20},children:[txt(`${idx+1}. ${c.check_id} — ${c.title||''}`,{bold:true,size:18})]}));
+      if (explain) children.push(new Paragraph({spacing:{after:120},indent:{left:240},children:[txt(explain,{size:17,color:COLOR_GRAY})]}));
+    });
+    children.push(new Paragraph({spacing:{before:120,after:80},children:[txt(lang==='en'?'Findings Overview':'Detaljeret gennemgang',{size:22,bold:true,color:COLOR_DARK})]}));
 
     // Table header row builder
     const headerCellWidths = [13,19,26,26,16];
@@ -26035,7 +26186,7 @@ async function generateWordReport(score, noteConstraints, noteNext, lang, licens
           width:{size:headerCellWidths[2],type:WidthType.PERCENTAGE}, margins:{top:80,bottom:80,left:80,right:80},
           children:[
             new Paragraph({spacing:{after:40},children:[txt(L.risk+': '+riskLevel.toUpperCase(),{bold:true,size:15,color:riskColors[riskLevel]||riskColors.Medium})]}),
-            new Paragraph({children:[txt(c.rationale ? c.rationale.trim() : L.noDescription,{size:16})]})
+            new Paragraph({children:[txt(c.rationale_short ? c.rationale_short.trim() : (c.rationale ? c.rationale.trim() : L.noDescription),{size:16})]})
           ]
         });
 
@@ -26043,7 +26194,7 @@ async function generateWordReport(score, noteConstraints, noteNext, lang, licens
           width:{size:headerCellWidths[3],type:WidthType.PERCENTAGE}, margins:{top:80,bottom:80,left:80,right:80},
           children:[
             new Paragraph({spacing:{after:40},children:[txt(L.impact+': '+impactLevel.toUpperCase(),{bold:true,size:15,color:impactColors[impactLevel]||impactColors.Medium})]}),
-            new Paragraph({children:[txt(c.impact ? c.impact.trim() : L.noDescription,{size:16})]})
+            new Paragraph({children:[txt(c.impact_short ? c.impact_short.trim() : (c.impact ? c.impact.trim() : L.noDescription),{size:16})]})
           ]
         });
 
@@ -26058,6 +26209,21 @@ async function generateWordReport(score, noteConstraints, noteNext, lang, licens
 
     const table = new Table({ width:{size:100,type:WidthType.PERCENTAGE}, rows: tableRows });
     children.push(table);
+
+    // ── STRATEGIC RECOMMENDATIONS ──
+    children.push(h1(L.secRecommendations));
+    children.push(bodyP(L.recommendationsIntro));
+    areasListW.forEach((c,idx)=>{
+      const actionTitle = (c.title||'').replace(/^Ensure\s+(that\s+)?/i, '');
+      children.push(new Paragraph({spacing:{after:100},children:[
+        txt(`${idx+1}. ${c.check_id} — `,{bold:true,size:18}),
+        txt(`${L.implementAction}: ${actionTitle}`,{size:18})
+      ]}));
+    });
+
+    // ── CONCLUSION ──
+    children.push(h1(L.secConclusion));
+    children.push(bodyP(L.conclusionText));
 
     const doc = new Document({
       creator: 'ADDvision',
@@ -26171,41 +26337,163 @@ async function generatePDFWithMeta(score, noteConstraints, noteNext, lang, licen
     }
     y += 34;
 
-    // ── License section ──
-    chk(24);
+    // ══════════════════════════════════════════════════════════════
+    // Table of Contents — reserve page, fill in at the end
+    // ══════════════════════════════════════════════════════════════
+    const tocEntries = [];
+    function startSection(label) {
+      newPage();
+      const pageNum = doc.internal.getNumberOfPages();
+      tocEntries.push({ label, page: pageNum });
+      return pageNum;
+    }
+    newPage(); // reserved ToC page
+    const tocPageNum = doc.internal.getNumberOfPages();
+
+    // ── OVERVIEW ──
+    startSection(L.secOverview);
+    doc.setFontSize(16); doc.setFont('helvetica','bold'); doc.setTextColor(29,78,216);
+    doc.text(L.secOverview, ml, y+6); y += 13;
+    doc.setFontSize(9); doc.setFont('helvetica','normal'); doc.setTextColor(31,41,55);
+    const overviewText = (OVERVIEW_TEXT[lang]||OVERVIEW_TEXT.da).replace(/\{CUSTOMER\}/g, selectedCustomer.name);
+    overviewText.split('\n\n').forEach(para => {
+      const lines = doc.splitTextToSize(para, cw);
+      chk(lines.length*4.3+4);
+      doc.text(lines, ml, y+3);
+      y += lines.length*4.3 + 5;
+    });
+    y += 4;
+
+    // License subsection
+    chk(20);
     doc.setFontSize(11); doc.setFont('helvetica','bold'); doc.setTextColor(29,78,216);
-    doc.text(L.licenseSection, ml, y+5);
-    y += 9;
+    doc.text(L.licenseSection, ml, y+5); y += 9;
     doc.setFontSize(8); doc.setFont('helvetica', licenseText ? 'normal' : 'italic'); doc.setTextColor(licenseText?55:156, licenseText?65:163, licenseText?81:175);
     const licenseLines = doc.splitTextToSize(licenseText ? licenseText : L.noLicense, cw);
     chk(licenseLines.length*4.2+6);
     doc.text(licenseLines, ml, y+3);
-    y += licenseLines.length*4.2 + 10;
+    y += licenseLines.length*4.2 + 12;
 
-    // ── Top 10 lists ──
-    const { critical: topCritical, good: topGood } = computeTopLists(checks, assessments);
-    function drawTopList(title, items, color) {
-      chk(14);
-      doc.setFontSize(11); doc.setFont('helvetica','bold'); doc.setTextColor(...color);
-      doc.text(title, ml, y+5);
+    // Risk distribution chart
+    const riskCounts = {Critical:0,High:0,Medium:0,Low:0};
+    checks.forEach(c=>{ riskCounts[c.risk_level||'Medium']++; });
+    const barColors = {Critical:[185,28,28],High:[234,88,12],Medium:[217,119,6],Low:[37,99,235]};
+    const maxRiskCount = Math.max(...Object.values(riskCounts),1);
+    chk(9 + 4*9 + 6);
+    doc.setFillColor(29,78,216); doc.rect(ml,y,cw,7,'F');
+    doc.setTextColor(255,255,255); doc.setFontSize(9); doc.setFont('helvetica','bold');
+    doc.text(L.riskChartTitle, ml+cw/2, y+4.8, {align:'center'});
+    y += 11;
+    const barAreaW = cw - 34;
+    ['Critical','High','Medium','Low'].forEach(level=>{
+      const count = riskCounts[level];
+      const barW = Math.max((count/maxRiskCount)*barAreaW, count>0?2:0);
+      doc.setFontSize(8); doc.setFont('helvetica','normal'); doc.setTextColor(55,65,81);
+      doc.text(level, ml, y+4.3);
+      doc.setFillColor(...barColors[level]);
+      doc.rect(ml+26, y, barW, 6, 'F');
+      doc.setFontSize(8); doc.setFont('helvetica','bold'); doc.setTextColor(31,41,55);
+      doc.text(String(count), ml+26+barW+3, y+4.3);
       y += 9;
-      if (items.length === 0) {
-        doc.setFontSize(8); doc.setFont('helvetica','italic'); doc.setTextColor(156,163,175);
-        doc.text(lang==='en' ? 'No matching items.' : 'Ingen punkter fundet.', ml, y+3);
-        y += 8;
-        return;
-      }
-      items.forEach((c, idx) => {
-        const titleLines = doc.splitTextToSize(`${idx+1}. ${c.check_id} — ${c.title||''}`, cw-4);
-        chk(titleLines.length*4.2+2);
-        doc.setFontSize(8); doc.setFont('helvetica','normal'); doc.setTextColor(31,41,55);
-        doc.text(titleLines, ml, y+3);
-        y += titleLines.length*4.2 + 1.5;
+    });
+    y += 6;
+
+    // ── SCOPE ──
+    startSection(L.secScope);
+    doc.setFontSize(16); doc.setFont('helvetica','bold'); doc.setTextColor(29,78,216);
+    doc.text(L.secScope, ml, y+6); y += 14;
+    (SCOPE_DOMAINS[lang]||SCOPE_DOMAINS.da).forEach(([title, desc])=>{
+      doc.setFontSize(9); doc.setFont('helvetica','bold'); doc.setTextColor(17,24,39);
+      const titleLines = doc.splitTextToSize(title, cw);
+      chk(titleLines.length*4.3+2);
+      doc.text(titleLines, ml, y+3); y += titleLines.length*4.3+1;
+      doc.setFontSize(8.5); doc.setFont('helvetica','normal'); doc.setTextColor(75,85,99);
+      const descLines = doc.splitTextToSize(desc, cw-4);
+      chk(descLines.length*4.1+5);
+      doc.text(descLines, ml+2, y+3); y += descLines.length*4.1+6;
+    });
+
+    // ── METHODOLOGY ──
+    startSection(L.secMethodology);
+    doc.setFontSize(16); doc.setFont('helvetica','bold'); doc.setTextColor(29,78,216);
+    doc.text(L.secMethodology, ml, y+6); y += 14;
+    (METHODOLOGY_STEPS[lang]||METHODOLOGY_STEPS.da).forEach(([title, desc], idx)=>{
+      doc.setFontSize(9); doc.setFont('helvetica','bold'); doc.setTextColor(17,24,39);
+      const titleLines = doc.splitTextToSize(`${idx+1}. ${title}`, cw);
+      chk(titleLines.length*4.3+2);
+      doc.text(titleLines, ml, y+3); y += titleLines.length*4.3+1;
+      doc.setFontSize(8.5); doc.setFont('helvetica','normal'); doc.setTextColor(75,85,99);
+      const descLines = doc.splitTextToSize(desc, cw-4);
+      chk(descLines.length*4.1+5);
+      doc.text(descLines, ml+4, y+3); y += descLines.length*4.1+6;
+    });
+
+    // ── AREAS FOR IMPROVEMENT ──
+    startSection(L.secAreas);
+    doc.setFontSize(16); doc.setFont('helvetica','bold'); doc.setTextColor(29,78,216);
+    doc.text(L.secAreas, ml, y+6); y += 14;
+    const areasList = computeAreasForImprovement(checks, assessments, 5);
+    if (areasList.length===0) {
+      doc.setFontSize(9); doc.setFont('helvetica','italic'); doc.setTextColor(107,114,128);
+      doc.text(L.noAreasFound, ml, y+3); y += 10;
+    } else {
+      areasList.forEach((c, idx)=>{
+        const riskLevel = c.risk_level||'Medium';
+        doc.setFontSize(9); doc.setFont('helvetica','bold'); doc.setTextColor(17,24,39);
+        const lines = doc.splitTextToSize(`${idx+1}. ${c.check_id} — ${c.title||''}`, cw-18);
+        chk(lines.length*4.3+2);
+        doc.text(lines, ml, y+3);
+        doc.setFontSize(7); doc.setFont('helvetica','bold'); doc.setTextColor(...(barColors[riskLevel]||barColors.Medium));
+        doc.text(riskLevel.toUpperCase(), pw-mr, y+3, {align:'right'});
+        y += lines.length*4.3+5;
       });
-      y += 6;
     }
-    drawTopList(L.topCriticalTitle, topCritical, [185,28,28]);
-    drawTopList(L.topGoodTitle, topGood, [22,163,74]);
+    y += 6;
+    chk(14);
+    doc.setFontSize(11); doc.setFont('helvetica','bold'); doc.setTextColor(29,78,216);
+    doc.text(L.impactRankingsTitle, ml, y+5); y += 10;
+    IMPACT_RANKING_DEFS[lang||'da'].forEach(([label, def])=>{
+      doc.setFontSize(8.5); doc.setFont('helvetica','bold'); doc.setTextColor(...(barColors[label.charAt(0)+label.slice(1).toLowerCase()]||[55,65,81]));
+      chk(6);
+      doc.text(label, ml, y+3); y += 5;
+      doc.setFontSize(8); doc.setFont('helvetica','normal'); doc.setTextColor(75,85,99);
+      const dLines = doc.splitTextToSize(def, cw-4);
+      chk(dLines.length*4.1+5);
+      doc.text(dLines, ml, y+2); y += dLines.length*4.1+6;
+    });
+
+    // ── FINDINGS ──
+    startSection(L.secFindings);
+    doc.setFontSize(16); doc.setFont('helvetica','bold'); doc.setTextColor(29,78,216);
+    doc.text(L.secFindings, ml, y+6); y += 13;
+    doc.setFontSize(8.5); doc.setFont('helvetica','normal'); doc.setTextColor(75,85,99);
+    let findingsIntroLines = doc.splitTextToSize(L.findingsIntro, cw);
+    chk(findingsIntroLines.length*4.1+6);
+    doc.text(findingsIntroLines, ml, y+3); y += findingsIntroLines.length*4.1+10;
+
+    chk(14);
+    doc.setFontSize(12); doc.setFont('helvetica','bold'); doc.setTextColor(17,24,39);
+    doc.text(L.secKeyFindings, ml, y+5); y += 9;
+    doc.setFontSize(8.5); doc.setFont('helvetica','normal'); doc.setTextColor(75,85,99);
+    let keyIntroLines = doc.splitTextToSize(L.keyFindingsIntro, cw);
+    chk(keyIntroLines.length*4.1+4);
+    doc.text(keyIntroLines, ml, y+3); y += keyIntroLines.length*4.1+7;
+
+    areasList.forEach((c, idx)=>{
+      const explain = c.impact_short || c.rationale_short || '';
+      doc.setFontSize(8.5); doc.setFont('helvetica','bold'); doc.setTextColor(17,24,39);
+      const titleL = doc.splitTextToSize(`${idx+1}. ${c.check_id} — ${c.title||''}`, cw);
+      chk(titleL.length*4.2+2);
+      doc.text(titleL, ml, y+3); y += titleL.length*4.2+1;
+      if (explain) {
+        doc.setFontSize(8); doc.setFont('helvetica','normal'); doc.setTextColor(75,85,99);
+        const expL = doc.splitTextToSize(explain, cw-4);
+        chk(expL.length*4.1+5);
+        doc.text(expL, ml+4, y+3); y += expL.length*4.1+5;
+      } else { y += 3; }
+    });
+    y += 6;
+
 
     // ── 5-kolonne tabel: Område | CIS kontrol | Risk | Impact | Diskuteret med kunden ──
     const colW = [cw*0.13, cw*0.19, cw*0.26, cw*0.26, cw*0.16];
@@ -26253,8 +26541,8 @@ async function generatePDFWithMeta(score, noteConstraints, noteNext, lang, licen
         doc.setFontSize(fs);
         const areaLines = [c.section||'', c.subsection||''].filter(Boolean).flatMap(t=>doc.splitTextToSize(t, colW[0]-4));
         const controlLines = doc.splitTextToSize(c.title||'', colW[1]-4);
-        const riskTextLines = doc.splitTextToSize(c.rationale ? c.rationale.trim() : L.noDescription, colW[2]-4);
-        const impactTextLines = doc.splitTextToSize(c.impact ? c.impact.trim() : L.noDescription, colW[3]-4);
+        const riskTextLines = doc.splitTextToSize(c.rationale_short ? c.rationale_short.trim() : (c.rationale ? c.rationale.trim() : L.noDescription), colW[2]-4);
+        const impactTextLines = doc.splitTextToSize(c.impact_short ? c.impact_short.trim() : (c.impact ? c.impact.trim() : L.noDescription), colW[3]-4);
         const discussLines = doc.splitTextToSize(comment ? comment.trim() : L.noComment, colW[4]-4);
 
         const h1 = areaLines.length*lineH + 2;
@@ -26263,8 +26551,6 @@ async function generatePDFWithMeta(score, noteConstraints, noteNext, lang, licen
         const h4 = (impactTextLines.length+1)*lineH + 3;
         const h5 = discussLines.length*lineH + 2;
         let rowH = Math.max(h1,h2,h3,h4,h5, 12);
-        const maxRowH = ph - 32;
-        if(rowH > maxRowH) rowH = maxRowH;
 
         if(chk(rowH+1)) drawTableHeader();
 
@@ -26316,6 +26602,57 @@ async function generatePDFWithMeta(score, noteConstraints, noteNext, lang, licen
       }
       y += 3;
     }
+
+    // ── STRATEGIC RECOMMENDATIONS ──
+    startSection(L.secRecommendations);
+    doc.setFontSize(16); doc.setFont('helvetica','bold'); doc.setTextColor(29,78,216);
+    doc.text(L.secRecommendations, ml, y+6); y += 13;
+    doc.setFontSize(8.5); doc.setFont('helvetica','normal'); doc.setTextColor(75,85,99);
+    const recIntroLines = doc.splitTextToSize(L.recommendationsIntro, cw);
+    chk(recIntroLines.length*4.1+6);
+    doc.text(recIntroLines, ml, y+3); y += recIntroLines.length*4.1+10;
+
+    areasList.forEach((c, idx)=>{
+      const actionTitle = (c.title||'').replace(/^Ensure\s+(that\s+)?/i, '');
+      const actionText = `${L.implementAction}: ${actionTitle}`;
+      doc.setFontSize(8.5); doc.setFont('helvetica','bold'); doc.setTextColor(17,24,39);
+      const lines = doc.splitTextToSize(`${idx+1}. ${c.check_id} — ${actionText}`, cw);
+      chk(lines.length*4.2+5);
+      doc.text(lines, ml, y+3); y += lines.length*4.2+5;
+    });
+    y += 6;
+
+    // ── CONCLUSION ──
+    startSection(L.secConclusion);
+    doc.setFontSize(16); doc.setFont('helvetica','bold'); doc.setTextColor(29,78,216);
+    doc.text(L.secConclusion, ml, y+6); y += 14;
+    doc.setFontSize(9); doc.setFont('helvetica','normal'); doc.setTextColor(31,41,55);
+    const conclLines = doc.splitTextToSize(L.conclusionText, cw);
+    chk(conclLines.length*4.3+4);
+    doc.text(conclLines, ml, y+3); y += conclLines.length*4.3+5;
+
+    // ── Fill in Table of Contents ──
+    doc.setPage(tocPageNum);
+    let tocY = 22;
+    doc.setFontSize(20); doc.setFont('helvetica','bold'); doc.setTextColor(17,24,39);
+    doc.text(L.toc, ml, tocY); tocY += 16;
+    tocEntries.forEach(entry=>{
+      doc.setFontSize(11); doc.setFont('helvetica','normal'); doc.setTextColor(31,41,55);
+      doc.text(entry.label, ml, tocY);
+      const pageStr = String(entry.page);
+      doc.setTextColor(107,114,128);
+      doc.text(pageStr, pw-mr, tocY, {align:'right'});
+      const labelW = doc.getTextWidth(entry.label);
+      const pageW = doc.getTextWidth(pageStr);
+      const dotsStart = ml+labelW+3, dotsEnd = pw-mr-pageW-3;
+      if (dotsEnd > dotsStart) {
+        doc.setDrawColor(200,200,200);
+        if (doc.setLineDashPattern) doc.setLineDashPattern([0.6,1.2], 0);
+        doc.line(dotsStart, tocY-1, dotsEnd, tocY-1);
+        if (doc.setLineDashPattern) doc.setLineDashPattern([], 0);
+      }
+      tocY += 11;
+    });
 
     const pc=doc.internal.getNumberOfPages();
     for(let i=1;i<=pc;i++){
