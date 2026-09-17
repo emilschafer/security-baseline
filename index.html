@@ -25855,35 +25855,80 @@ function openPDFModal() {
 
 
 
+const REPORT_LABELS = {
+  da: {
+    title: 'Security Baseline Rapport', customer: 'Kunde', generated: 'Genereret', overallStatus: 'SAMLET STATUS',
+    secureScore: 'SECURE SCORE', assessed: 'vurderet', notes: 'Noter', nextSteps: 'Næste skridt',
+    licenseSection: 'Licensvurdering', topCriticalTitle: 'Top 10 — Kritiske punkter der bør prioriteres',
+    topGoodTitle: 'Top 10 — Allerede godt på plads', area: 'OMRÅDE', control: 'CIS KONTROL', risk: 'RISK', impact: 'IMPACT',
+    discussedWith: 'DISKUTERET MED', statusLabels: { implemented:'Implementeret', accepted:'Accepteret', review:'Under review', declined:'Afvist', none:'Ikke vurderet' },
+    noComment: 'Ingen kommentarer endnu.', noDescription: 'Ingen beskrivelse tilgængelig.', noLicense: 'Ingen licensvurdering angivet.'
+  },
+  en: {
+    title: 'Security Baseline Report', customer: 'Customer', generated: 'Generated', overallStatus: 'OVERALL STATUS',
+    secureScore: 'SECURE SCORE', assessed: 'assessed', notes: 'Notes', nextSteps: 'Next steps',
+    licenseSection: 'License Assessment', topCriticalTitle: 'Top 10 — Critical Points to Prioritize',
+    topGoodTitle: 'Top 10 — Already in Good Shape', area: 'AREA', control: 'CIS CONTROL', risk: 'RISK', impact: 'IMPACT',
+    discussedWith: 'DISCUSSED WITH', statusLabels: { implemented:'Implemented', accepted:'Accepted', review:'Under review', declined:'Declined', none:'Not assessed' },
+    noComment: 'No comments yet.', noDescription: 'No description available.', noLicense: 'No license assessment provided.'
+  }
+};
+
+function computeTopLists(checksArr, assessmentsObj) {
+  const riskOrder = { Critical:4, High:3, Medium:2, Low:1 };
+  const withStatus = checksArr.map(c => {
+    const a = assessmentsObj[c.check_id] || assessmentsObj[c.spId] || {};
+    return { check: c, status: a.status || 'none', riskScore: riskOrder[c.risk_level||'Medium'] || 2 };
+  });
+  const critical = withStatus
+    .filter(x => x.status === 'none' || x.status === 'review')
+    .sort((a,b) => b.riskScore - a.riskScore)
+    .slice(0, 10)
+    .map(x => x.check);
+  const good = withStatus
+    .filter(x => x.status === 'implemented')
+    .sort((a,b) => b.riskScore - a.riskScore)
+    .slice(0, 10)
+    .map(x => x.check);
+  return { critical, good };
+}
+
 async function doGeneratePDF() {
   const score = document.getElementById('pdf-score').value;
   const noteConstraints = document.getElementById('pdf-note-constraints').value.trim();
   const noteNext = document.getElementById('pdf-note-next').value.trim();
-  await generatePDFWithMeta(score, noteConstraints, noteNext);
+  const noteLicense = document.getElementById('pdf-note-license').value.trim();
+  const lang = document.querySelector('input[name="pdf-lang"]:checked')?.value || 'da';
+  await generatePDFWithMeta(score, noteConstraints, noteNext, lang, noteLicense);
 }
 
 async function doGenerateWord() {
   const score = document.getElementById('pdf-score').value;
   const noteConstraints = document.getElementById('pdf-note-constraints').value.trim();
   const noteNext = document.getElementById('pdf-note-next').value.trim();
-  await generateWordReport(score, noteConstraints, noteNext);
+  const noteLicense = document.getElementById('pdf-note-license').value.trim();
+  const lang = document.querySelector('input[name="pdf-lang"]:checked')?.value || 'da';
+  await generateWordReport(score, noteConstraints, noteNext, lang, noteLicense);
 }
 
-async function generateWordReport(score, noteConstraints, noteNext) {
+async function generateWordReport(score, noteConstraints, noteNext, lang, licenseText) {
   showToast('Genererer Word-dokument…');
   try {
+    lang = lang || 'da';
+    const L = REPORT_LABELS[lang] || REPORT_LABELS.da;
     const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, WidthType, ShadingType, VerticalAlign, HeadingLevel, AlignmentType, BorderStyle, PageOrientation, convertInchesToTwip } = docx;
 
     const COLOR_PRIMARY = '1D4ED8', COLOR_DARK = '111827', COLOR_GRAY = '6B7280', COLOR_ACCENT = '3B82F6';
     const riskColors = { Critical:'B91C1C', High:'C2410C', Medium:'B45309', Low:'15803D' };
     const impactColors = { High:'4338CA', Medium:'0369A1', Low:'475569' };
     const statusColors = { implemented:'16A34A', accepted:'2563EB', review:'D97706', declined:'DC2626', none:'9CA3AF' };
-    const statusLabels = { implemented:'Implemented', accepted:'Accepted', review:'Under review', declined:'Declined', none:'Ikke vurderet' };
+    const statusLabels = L.statusLabels;
 
     function txt(text, opts={}) { return new TextRun({ text: text||'', font:'Calibri', size: opts.size||18, color: opts.color||COLOR_DARK, bold: opts.bold||false, italics: opts.italics||false }); }
 
-    const custName = selectedCustomer?.name || 'Kunden';
+    const custName = selectedCustomer?.name || (lang==='en' ? 'Customer' : 'Kunden');
     const custNameUp = custName.toUpperCase();
+    const dateLocale = lang === 'en' ? 'en-GB' : 'da-DK';
 
     const done = checks.filter(c => { const a=(assessments[c.check_id]||assessments[c.spId]); return a?.status && a.status!=='none'; }).length;
     const pct = checks.length ? Math.round(done/checks.length*100) : 0;
@@ -25893,28 +25938,52 @@ async function generateWordReport(score, noteConstraints, noteNext) {
     const children = [];
 
     // Header
-    children.push(new Paragraph({ spacing:{after:120}, children:[txt('Security Baseline Rapport',{size:36,bold:true,color:COLOR_PRIMARY})] }));
-    children.push(new Paragraph({ spacing:{after:60}, children:[txt(`Kunde: ${custName}`,{size:20,color:COLOR_GRAY})] }));
-    children.push(new Paragraph({ spacing:{after:200}, children:[txt(`Genereret: ${new Date().toLocaleDateString('da-DK',{day:'2-digit',month:'long',year:'numeric'})} · CIS M365 v7.0.0`,{size:18,color:COLOR_GRAY})] }));
+    children.push(new Paragraph({ spacing:{after:120}, children:[txt(L.title,{size:36,bold:true,color:COLOR_PRIMARY})] }));
+    children.push(new Paragraph({ spacing:{after:60}, children:[txt(`${L.customer}: ${custName}`,{size:20,color:COLOR_GRAY})] }));
+    children.push(new Paragraph({ spacing:{after:200}, children:[txt(`${L.generated}: ${new Date().toLocaleDateString(dateLocale,{day:'2-digit',month:'long',year:'numeric'})} · CIS M365 v7.0.0`,{size:18,color:COLOR_GRAY})] }));
 
     children.push(new Paragraph({ spacing:{after:60}, children:[
-      txt('SAMLET STATUS:  ',{bold:true,size:18}), txt(`${pct}% (${done} / ${checks.length} vurderet)   `,{size:18}),
-      ...(score ? [txt('SECURE SCORE:  ',{bold:true,size:18}), txt(`${score}%`,{size:18})] : [])
+      txt(`${L.overallStatus}:  `,{bold:true,size:18}), txt(`${pct}% (${done} / ${checks.length} ${L.assessed})   `,{size:18}),
+      ...(score ? [txt(`${L.secureScore}:  `,{bold:true,size:18}), txt(`${score}%`,{size:18})] : [])
     ]}));
     children.push(new Paragraph({ spacing:{after:60}, children:[
-      txt(`${counts.implemented} Implemented   `,{size:16,color:statusColors.implemented,bold:true}),
-      txt(`${counts.accepted} Accepted   `,{size:16,color:statusColors.accepted,bold:true}),
-      txt(`${counts.review} Under review   `,{size:16,color:statusColors.review,bold:true}),
-      txt(`${counts.declined} Declined   `,{size:16,color:statusColors.declined,bold:true}),
-      txt(`${counts.none} Ikke vurderet`,{size:16,color:statusColors.none,bold:true}),
+      txt(`${counts.implemented} ${statusLabels.implemented}   `,{size:16,color:statusColors.implemented,bold:true}),
+      txt(`${counts.accepted} ${statusLabels.accepted}   `,{size:16,color:statusColors.accepted,bold:true}),
+      txt(`${counts.review} ${statusLabels.review}   `,{size:16,color:statusColors.review,bold:true}),
+      txt(`${counts.declined} ${statusLabels.declined}   `,{size:16,color:statusColors.declined,bold:true}),
+      txt(`${counts.none} ${statusLabels.none}`,{size:16,color:statusColors.none,bold:true}),
     ]}));
-    if (noteConstraints) children.push(new Paragraph({ spacing:{after:40}, children:[txt('Noter: ',{bold:true,size:17,color:'92400E'}), txt(noteConstraints,{size:17,color:'5C2B0C'})] }));
-    if (noteNext) children.push(new Paragraph({ spacing:{after:200}, children:[txt('Næste skridt: ',{bold:true,size:17,color:'1E40AF'}), txt(noteNext,{size:17,color:COLOR_PRIMARY})] }));
+    if (noteConstraints) children.push(new Paragraph({ spacing:{after:40}, children:[txt(`${L.notes}: `,{bold:true,size:17,color:'92400E'}), txt(noteConstraints,{size:17,color:'5C2B0C'})] }));
+    if (noteNext) children.push(new Paragraph({ spacing:{after:200}, children:[txt(`${L.nextSteps}: `,{bold:true,size:17,color:'1E40AF'}), txt(noteNext,{size:17,color:COLOR_PRIMARY})] }));
+
+    // License section
+    children.push(new Paragraph({ spacing:{before:100,after:80}, children:[txt(L.licenseSection,{size:24,bold:true,color:COLOR_PRIMARY})] }));
+    children.push(new Paragraph({ spacing:{after:200}, children:[txt(licenseText ? licenseText : L.noLicense, {size:18, italics: !licenseText, color: licenseText ? COLOR_DARK : COLOR_GRAY})] }));
+
+    // Top 10 lists
+    const { critical: topCritical, good: topGood } = computeTopLists(checks, assessments);
+    function renderTopList(title, items, color) {
+      children.push(new Paragraph({ spacing:{before:100,after:80}, children:[txt(title,{size:22,bold:true,color})] }));
+      if (items.length === 0) {
+        children.push(new Paragraph({ spacing:{after:120}, children:[txt(lang==='en' ? 'No matching items.' : 'Ingen punkter fundet.', {size:17, italics:true, color:COLOR_GRAY})] }));
+      } else {
+        items.forEach((c, idx) => {
+          children.push(new Paragraph({ spacing:{after:60}, children:[
+            txt(`${idx+1}. `,{bold:true,size:18,color}),
+            txt(`${c.check_id}  `,{bold:true,size:18,color:COLOR_ACCENT}),
+            txt(c.title||'',{size:18})
+          ]}));
+        });
+      }
+    }
+    renderTopList(L.topCriticalTitle, topCritical, 'B91C1C');
+    renderTopList(L.topGoodTitle, topGood, '16A34A');
+    children.push(new Paragraph({ spacing:{after:100} }));
 
     // Table header row builder
     const headerCellWidths = [13,19,26,26,16];
     function headerRow() {
-      return new TableRow({ tableHeader:true, children: ['OMRÅDE','CIS KONTROL','RISK','IMPACT',`DISKUTERET MED ${custNameUp}`].map((h,i) => new TableCell({
+      return new TableRow({ tableHeader:true, children: [L.area, L.control, L.risk, L.impact, `${L.discussedWith} ${custNameUp}`].map((h,i) => new TableCell({
         width:{size:headerCellWidths[i],type:WidthType.PERCENTAGE},
         shading:{fill:'1D4ED8',type:ShadingType.CLEAR},
         margins:{top:60,bottom:60,left:80,right:80},
@@ -25965,22 +26034,22 @@ async function generateWordReport(score, noteConstraints, noteNext) {
         const riskCell = new TableCell({
           width:{size:headerCellWidths[2],type:WidthType.PERCENTAGE}, margins:{top:80,bottom:80,left:80,right:80},
           children:[
-            new Paragraph({spacing:{after:40},children:[txt('RISK: '+riskLevel.toUpperCase(),{bold:true,size:15,color:riskColors[riskLevel]||riskColors.Medium})]}),
-            new Paragraph({children:[txt(c.rationale ? c.rationale.trim() : 'Ingen beskrivelse tilgængelig.',{size:16})]})
+            new Paragraph({spacing:{after:40},children:[txt(L.risk+': '+riskLevel.toUpperCase(),{bold:true,size:15,color:riskColors[riskLevel]||riskColors.Medium})]}),
+            new Paragraph({children:[txt(c.rationale ? c.rationale.trim() : L.noDescription,{size:16})]})
           ]
         });
 
         const impactCell = new TableCell({
           width:{size:headerCellWidths[3],type:WidthType.PERCENTAGE}, margins:{top:80,bottom:80,left:80,right:80},
           children:[
-            new Paragraph({spacing:{after:40},children:[txt('IMPACT: '+impactLevel.toUpperCase(),{bold:true,size:15,color:impactColors[impactLevel]||impactColors.Medium})]}),
-            new Paragraph({children:[txt(c.impact ? c.impact.trim() : 'Ingen beskrivelse tilgængelig.',{size:16})]})
+            new Paragraph({spacing:{after:40},children:[txt(L.impact+': '+impactLevel.toUpperCase(),{bold:true,size:15,color:impactColors[impactLevel]||impactColors.Medium})]}),
+            new Paragraph({children:[txt(c.impact ? c.impact.trim() : L.noDescription,{size:16})]})
           ]
         });
 
         const discussCell = new TableCell({
           width:{size:headerCellWidths[4],type:WidthType.PERCENTAGE}, margins:{top:80,bottom:80,left:80,right:80},
-          children:[new Paragraph({children:[txt(comment ? comment.trim() : 'Ingen kommentarer endnu.',{size:16,italics:!comment,color:comment?COLOR_DARK:COLOR_GRAY})]})]
+          children:[new Paragraph({children:[txt(comment ? comment.trim() : L.noComment,{size:16,italics:!comment,color:comment?COLOR_DARK:COLOR_GRAY})]})]
         });
 
         tableRows.push(new TableRow({ children:[areaCell,controlCell,riskCell,impactCell,discussCell] }));
@@ -25992,7 +26061,7 @@ async function generateWordReport(score, noteConstraints, noteNext) {
 
     const doc = new Document({
       creator: 'ADDvision',
-      title: `Security Baseline Rapport - ${custName}`,
+      title: `${L.title} - ${custName}`,
       sections: [{
         properties: {
           page: {
@@ -26021,9 +26090,12 @@ async function generateWordReport(score, noteConstraints, noteNext) {
   } catch(e) { showToast('Word fejl: '+e.message, 'error'); console.error(e); }
 }
 
-async function generatePDFWithMeta(score, noteConstraints, noteNext) {
+async function generatePDFWithMeta(score, noteConstraints, noteNext, lang, licenseText) {
   showToast('Genererer PDF…');
   try {
+    lang = lang || 'da';
+    const L = REPORT_LABELS[lang] || REPORT_LABELS.da;
+    const dateLocale = lang === 'en' ? 'en-GB' : 'da-DK';
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF({ orientation:'landscape', unit:'mm', format:'a4' });
     const pw=297, ph=210, ml=12, mr=12, cw=pw-ml-mr;
@@ -26035,17 +26107,17 @@ async function generatePDFWithMeta(score, noteConstraints, noteNext) {
     doc.setFillColor(29,78,216); doc.rect(0,0,pw,40,'F');
     doc.setTextColor(255,255,255);
     doc.setFontSize(19); doc.setFont('helvetica','bold');
-    doc.text('Security Baseline Rapport', ml, 16);
+    doc.text(L.title, ml, 16);
     doc.setFontSize(9.5); doc.setFont('helvetica','normal');
     doc.setTextColor(191,206,247);
-    doc.text(`Kunde: ${selectedCustomer.name}`, ml, 23.5);
-    doc.text(`Genereret: ${new Date().toLocaleDateString('da-DK',{day:'2-digit',month:'long',year:'numeric'})} · CIS M365 v7.0.0`, ml, 29);
+    doc.text(`${L.customer}: ${selectedCustomer.name}`, ml, 23.5);
+    doc.text(`${L.generated}: ${new Date().toLocaleDateString(dateLocale,{day:'2-digit',month:'long',year:'numeric'})} · CIS M365 v7.0.0`, ml, 29);
     const done = checks.filter(c=>(assessments[c.check_id] || assessments[c.spId])?.status && (assessments[c.check_id] || assessments[c.spId])?.status!=='none').length;
     const pct = checks.length ? Math.round(done/checks.length*100) : 0;
     doc.setFillColor(224,231,255); doc.rect(ml,33,cw,3,'F');
     doc.setFillColor(255,255,255); doc.rect(ml,33,cw*(pct/100),3,'F');
     doc.setTextColor(191,206,247); doc.setFontSize(8.5);
-    doc.text(`${done} ud af ${checks.length} punkter vurderet (${pct}%)`, ml, 39);
+    doc.text(`${done} / ${checks.length} ${L.assessed} (${pct}%)`, ml, 39);
     y = 47;
 
     // Summary bar
@@ -26055,27 +26127,27 @@ async function generatePDFWithMeta(score, noteConstraints, noteNext) {
     checks.forEach(c=>{const s=((assessments[c.check_id] || assessments[c.spId]) || {}).status||'none';counts[s]++;});
 
     doc.setFontSize(7.5); doc.setFont('helvetica','bold'); doc.setTextColor(107,114,128);
-    doc.text('SAMLET STATUS', ml, y+3);
+    doc.text(L.overallStatus, ml, y+3);
     doc.setFontSize(15); doc.setFont('helvetica','bold'); doc.setTextColor(17,24,39);
     doc.text(pct+'%', ml, y+11);
     doc.setFontSize(7.5); doc.setFont('helvetica','normal'); doc.setTextColor(156,163,175);
-    doc.text(`${done} / ${checks.length} vurderet`, ml, y+15.5);
+    doc.text(`${done} / ${checks.length} ${L.assessed}`, ml, y+15.5);
 
     if(score) {
       const sc = parseInt(score);
       const scC = sc<40?[220,38,38]:sc<70?[217,119,6]:[22,163,74];
       doc.setFontSize(7.5); doc.setFont('helvetica','bold'); doc.setTextColor(107,114,128);
-      doc.text('SECURE SCORE', ml+42, y+3);
+      doc.text(L.secureScore, ml+42, y+3);
       doc.setFontSize(15); doc.setFont('helvetica','bold'); doc.setTextColor(...scC);
       doc.text(sc+'%', ml+42, y+11);
       doc.setFillColor(229,231,235); doc.rect(ml+42,y+13.5,45,2,'F');
       doc.setFillColor(...scC); doc.rect(ml+42,y+13.5,45*(sc/100),2,'F');
     }
 
-    const pills=[{l:`${counts.implemented}  Implemented`,c:[22,163,74]},{l:`${counts.accepted}  Accepted`,c:[37,99,235]},{l:`${counts.review}  Under review`,c:[217,119,6]},{l:`${counts.declined}  Declined`,c:[220,38,38]},{l:`${counts.none}  Ikke vurderet`,c:[156,163,175]}];
+    const pills=[{l:`${counts.implemented}  ${L.statusLabels.implemented}`,c:[22,163,74]},{l:`${counts.accepted}  ${L.statusLabels.accepted}`,c:[37,99,235]},{l:`${counts.review}  ${L.statusLabels.review}`,c:[217,119,6]},{l:`${counts.declined}  ${L.statusLabels.declined}`,c:[220,38,38]},{l:`${counts.none}  ${L.statusLabels.none}`,c:[156,163,175]}];
     let px=ml+92;
     doc.setFontSize(6.5); doc.setFont('helvetica','bold'); doc.setTextColor(107,114,128);
-    doc.text('FORDELING', px, y+2);
+    doc.text(lang==='en'?'BREAKDOWN':'FORDELING', px, y+2);
     pills.forEach(p=>{
       doc.setFillColor(...p.c); doc.circle(px+1.3, y+6.2, 1.3, 'F');
       doc.setFontSize(7);doc.setFont('helvetica','bold');doc.setTextColor(...p.c);
@@ -26085,19 +26157,55 @@ async function generatePDFWithMeta(score, noteConstraints, noteNext) {
     px = ml+92;
     if(noteConstraints) {
       doc.setFontSize(6.5);doc.setFont('helvetica','bold');doc.setTextColor(146,64,14);
-      doc.text('NOTER:',px,y+15);
+      doc.text(L.notes.toUpperCase()+':',px,y+15);
       doc.setFont('helvetica','normal');doc.setTextColor(92,43,12);doc.setFontSize(7);
       const l=doc.splitTextToSize(noteConstraints,cw-92-30)[0]||'';
       doc.text(l,px+13,y+15);
     }
     if(noteNext) {
       doc.setFontSize(6.5);doc.setFont('helvetica','bold');doc.setTextColor(30,64,175);
-      doc.text('NÆSTE SKRIDT:',px,y+20);
+      doc.text(L.nextSteps.toUpperCase()+':',px,y+20);
       doc.setFont('helvetica','normal');doc.setTextColor(29,78,216);doc.setFontSize(7);
       const l2=doc.splitTextToSize(noteNext,cw-92-30)[0]||'';
       doc.text(l2,px+22,y+20);
     }
     y += 34;
+
+    // ── License section ──
+    chk(24);
+    doc.setFontSize(11); doc.setFont('helvetica','bold'); doc.setTextColor(29,78,216);
+    doc.text(L.licenseSection, ml, y+5);
+    y += 9;
+    doc.setFontSize(8); doc.setFont('helvetica', licenseText ? 'normal' : 'italic'); doc.setTextColor(licenseText?55:156, licenseText?65:163, licenseText?81:175);
+    const licenseLines = doc.splitTextToSize(licenseText ? licenseText : L.noLicense, cw);
+    chk(licenseLines.length*4.2+6);
+    doc.text(licenseLines, ml, y+3);
+    y += licenseLines.length*4.2 + 10;
+
+    // ── Top 10 lists ──
+    const { critical: topCritical, good: topGood } = computeTopLists(checks, assessments);
+    function drawTopList(title, items, color) {
+      chk(14);
+      doc.setFontSize(11); doc.setFont('helvetica','bold'); doc.setTextColor(...color);
+      doc.text(title, ml, y+5);
+      y += 9;
+      if (items.length === 0) {
+        doc.setFontSize(8); doc.setFont('helvetica','italic'); doc.setTextColor(156,163,175);
+        doc.text(lang==='en' ? 'No matching items.' : 'Ingen punkter fundet.', ml, y+3);
+        y += 8;
+        return;
+      }
+      items.forEach((c, idx) => {
+        const titleLines = doc.splitTextToSize(`${idx+1}. ${c.check_id} — ${c.title||''}`, cw-4);
+        chk(titleLines.length*4.2+2);
+        doc.setFontSize(8); doc.setFont('helvetica','normal'); doc.setTextColor(31,41,55);
+        doc.text(titleLines, ml, y+3);
+        y += titleLines.length*4.2 + 1.5;
+      });
+      y += 6;
+    }
+    drawTopList(L.topCriticalTitle, topCritical, [185,28,28]);
+    drawTopList(L.topGoodTitle, topGood, [22,163,74]);
 
     // ── 5-kolonne tabel: Område | CIS kontrol | Risk | Impact | Diskuteret med kunden ──
     const colW = [cw*0.13, cw*0.19, cw*0.26, cw*0.26, cw*0.16];
@@ -26107,7 +26215,7 @@ async function generatePDFWithMeta(score, noteConstraints, noteNext) {
     function drawTableHeader() {
       doc.setFillColor(29,78,216); doc.rect(ml,y,cw,7,'F');
       doc.setTextColor(255,255,255); doc.setFontSize(7); doc.setFont('helvetica','bold');
-      const heads = ['OMRÅDE','CIS KONTROL','RISK','IMPACT',`DISKUTERET MED ${custNameUp}`];
+      const heads = [L.area, L.control, L.risk, L.impact, `${L.discussedWith} ${custNameUp}`];
       heads.forEach((h,i)=>{
         const hh = doc.splitTextToSize(h, colW[i]-3);
         doc.text(hh[0], colX[i]+2, y+4.7);
@@ -26117,7 +26225,7 @@ async function generatePDFWithMeta(score, noteConstraints, noteNext) {
     drawTableHeader();
 
     const statusColors={implemented:[22,163,74],accepted:[37,99,235],review:[217,119,6],declined:[220,38,38],none:[156,163,175]};
-    const statusLabels={implemented:'Implemented',accepted:'Accepted',review:'Under review',declined:'Declined',none:'Ikke vurderet'};
+    const statusLabels=L.statusLabels;
     const riskColors={Critical:[185,28,28],High:[194,65,12],Medium:[180,83,9],Low:[21,128,61]};
     const riskBg={Critical:[254,242,242],High:[255,247,237],Medium:[255,251,235],Low:[240,253,244]};
     const impactColors={High:[67,56,202],Medium:[3,105,161],Low:[71,85,105]};
@@ -26145,9 +26253,9 @@ async function generatePDFWithMeta(score, noteConstraints, noteNext) {
         doc.setFontSize(fs);
         const areaLines = [c.section||'', c.subsection||''].filter(Boolean).flatMap(t=>doc.splitTextToSize(t, colW[0]-4));
         const controlLines = doc.splitTextToSize(c.title||'', colW[1]-4);
-        const riskTextLines = doc.splitTextToSize(c.rationale ? c.rationale.trim() : 'Ingen beskrivelse tilgængelig.', colW[2]-4);
-        const impactTextLines = doc.splitTextToSize(c.impact ? c.impact.trim() : 'Ingen beskrivelse tilgængelig.', colW[3]-4);
-        const discussLines = doc.splitTextToSize(comment ? comment.trim() : 'Ingen kommentarer endnu.', colW[4]-4);
+        const riskTextLines = doc.splitTextToSize(c.rationale ? c.rationale.trim() : L.noDescription, colW[2]-4);
+        const impactTextLines = doc.splitTextToSize(c.impact ? c.impact.trim() : L.noDescription, colW[3]-4);
+        const discussLines = doc.splitTextToSize(comment ? comment.trim() : L.noComment, colW[4]-4);
 
         const h1 = areaLines.length*lineH + 2;
         const h2 = (controlLines.length+1)*lineH + 2;
@@ -26186,7 +26294,7 @@ async function generatePDFWithMeta(score, noteConstraints, noteNext) {
         doc.setFillColor(...(riskBg[riskLevel]||riskBg.Medium));
         doc.roundedRect(colX[2]+2, y+1.6, colW[2]-4, 4.2, 0.8, 0.8, 'F');
         doc.setFontSize(6.3); doc.setFont('helvetica','bold'); doc.setTextColor(...(riskColors[riskLevel]||riskColors.Medium));
-        doc.text('RISK: '+riskLevel.toUpperCase(), colX[2]+4, y+4.4);
+        doc.text(L.risk+': '+riskLevel.toUpperCase(), colX[2]+4, y+4.4);
         doc.setFontSize(fs); doc.setFont('helvetica','normal'); doc.setTextColor(55,65,81);
         doc.text(riskTextLines, colX[2]+2, y+1.6+4.2+lineH);
 
@@ -26194,7 +26302,7 @@ async function generatePDFWithMeta(score, noteConstraints, noteNext) {
         doc.setFillColor(...(impactBg[impactLevel]||impactBg.Medium));
         doc.roundedRect(colX[3]+2, y+1.6, colW[3]-4, 4.2, 0.8, 0.8, 'F');
         doc.setFontSize(6.3); doc.setFont('helvetica','bold'); doc.setTextColor(...(impactColors[impactLevel]||impactColors.Medium));
-        doc.text('IMPACT: '+impactLevel.toUpperCase(), colX[3]+4, y+4.4);
+        doc.text(L.impact+': '+impactLevel.toUpperCase(), colX[3]+4, y+4.4);
         doc.setFontSize(fs); doc.setFont('helvetica','normal'); doc.setTextColor(55,65,81);
         doc.text(impactTextLines, colX[3]+2, y+1.6+4.2+lineH);
 
@@ -26214,7 +26322,7 @@ async function generatePDFWithMeta(score, noteConstraints, noteNext) {
       doc.setPage(i);
       doc.setDrawColor(229,231,235);doc.line(ml,ph-11,pw-mr,ph-11);
       doc.setFontSize(7);doc.setTextColor(156,163,175);doc.setFont('helvetica','normal');
-      doc.text(`Security Baseline · ${selectedCustomer.name} · Fortroligt · Side ${i} af ${pc}`,pw/2,ph-6,{align:'center'});
+      doc.text(lang==='en' ? `Security Baseline · ${selectedCustomer.name} · Confidential · Page ${i} of ${pc}` : `Security Baseline · ${selectedCustomer.name} · Fortroligt · Side ${i} af ${pc}`,pw/2,ph-6,{align:'center'});
     }
 
     doc.save(`Baseline-${selectedCustomer.name.replace(/\s+/g,'-')}-${new Date().toISOString().slice(0,10)}.pdf`);
@@ -26499,6 +26607,17 @@ initMsal();
     </div>
     <div class="modal-body" id="pdf-form-body">
       <div class="form-group">
+        <label>Sprog</label>
+        <div style="display:flex;gap:16px;">
+          <label style="display:flex;align-items:center;gap:6px;font-weight:400;cursor:pointer;">
+            <input type="radio" name="pdf-lang" value="da" checked> Dansk
+          </label>
+          <label style="display:flex;align-items:center;gap:6px;font-weight:400;cursor:pointer;">
+            <input type="radio" name="pdf-lang" value="en"> English
+          </label>
+        </div>
+      </div>
+      <div class="form-group">
         <label>Microsoft Secure Score</label>
         <div style="display:flex;align-items:center;gap:10px;">
           <input type="number" id="pdf-score" min="0" max="100" placeholder="fx 37" style="max-width:100px;" oninput="updateScoreBar(this.value)">
@@ -26507,6 +26626,11 @@ initMsal();
           </div>
           <span id="score-pct" style="font-size:12px;font-weight:500;min-width:36px;color:var(--text3);">–</span>
         </div>
+      </div>
+      <div class="form-group">
+        <label>Licensvurdering</label>
+        <textarea id="pdf-note-license" placeholder="Fx: Kunden har Business Premium på alle brugere, hvilket dækker behovet for CA og Intune. Der mangler dog Defender for Office 365 P2 til Attack Simulator…" style="min-height:70px;"></textarea>
+        <div style="font-size:11px;color:var(--text3);margin-top:3px;">Vises som selvstændig sektion i rapporten</div>
       </div>
       <div class="form-group">
         <label>Noter</label>
