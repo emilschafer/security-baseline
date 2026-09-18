@@ -25294,6 +25294,14 @@ async function ensureLists() {
 }
 
 // ── GRAPH CRUD ───────────────────────────────────
+function stripHtml(text) {
+  if (!text) return text;
+  // Strip SharePoint's rich-text wrapper (e.g. <div class="ExternalClass...">...</div>) and any other HTML tags
+  let out = String(text).replace(/<[^>]*>/g, '');
+  out = out.replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'");
+  return out.trim();
+}
+
 async function getListItems(listId) {
   let allItems = [];
   let endpoint = `/sites/${siteId}/lists/${listId}/items?$top=999&$expand=fields&$select=id,fields`;
@@ -25307,7 +25315,9 @@ async function getListItems(listId) {
     try { parsed = { spId: i.id, ...JSON.parse(i.fields.Title) }; }
     catch(e) { parsed = { spId: i.id }; }
     if (i.fields.CommentText !== undefined && i.fields.CommentText !== null && i.fields.CommentText !== '') {
-      parsed.Comment = i.fields.CommentText;
+      parsed.Comment = stripHtml(i.fields.CommentText);
+    } else if (parsed.Comment) {
+      parsed.Comment = stripHtml(parsed.Comment);
     }
     return parsed;
   });
@@ -25872,6 +25882,9 @@ const REPORT_LABELS = {
     keyFindingsIntro: 'Herunder følger de vigtigste fund fra gennemgangen — de punkter der har størst potentiel konsekvens hvis de ikke adresseres.',
     recommendationsIntro: 'Baseret på de identificerede fund anbefales følgende tiltag prioriteret efter risiko.',
     conclusionText: 'Denne rapport giver et samlet billede af sikkerhedstilstanden i Microsoft 365-miljøet, vurderet op mod CIS Microsoft 365 Foundations Benchmark. De identificerede fund og anbefalinger bør danne grundlag for en prioriteret handlingsplan. ADDvision anbefaler løbende opfølgning og genvurdering, i takt med at både organisationen og trusselsbilledet udvikler sig.',
+    areasThemesIntro: 'Herunder ses de områder hvor flest udestående punkter er identificeret, sorteret efter risikoniveau.',
+    outstandingPoints: 'udestående punkter',
+    highestPriority: 'Højeste prioritet',
     implementAction: 'Implementér',
     noAreasFound: 'Ingen kritiske forbedringspunkter fundet — alt væsentligt er på plads.'
   },
@@ -25891,6 +25904,9 @@ const REPORT_LABELS = {
     keyFindingsIntro: 'The following are the most significant findings from this review — the points with the greatest potential impact if left unaddressed.',
     recommendationsIntro: 'Based on the findings identified, the following actions are recommended, prioritized by risk.',
     conclusionText: 'This report provides an overall picture of the security posture of the Microsoft 365 environment, assessed against the CIS Microsoft 365 Foundations Benchmark. The findings and recommendations identified should form the basis of a prioritized action plan. ADDvision recommends ongoing follow-up and reassessment as both the organization and the threat landscape evolve.',
+    areasThemesIntro: 'The areas below have the highest number of outstanding points identified, sorted by risk level.',
+    outstandingPoints: 'outstanding points',
+    highestPriority: 'Highest priority',
     implementAction: 'Implement',
     noAreasFound: 'No critical improvement points found — everything essential is in place.'
   }
@@ -25959,6 +25975,29 @@ const OVERVIEW_TEXT = {
 function computeAreasForImprovement(checksArr, assessmentsObj, count) {
   const { critical } = computeTopLists(checksArr, assessmentsObj);
   return critical.slice(0, count || 5);
+}
+
+function computeAreaThemes(checksArr, assessmentsObj, count) {
+  const riskOrder = { Critical:4, High:3, Medium:2, Low:1 };
+  const outstanding = checksArr.map(c => {
+    const a = assessmentsObj[c.check_id] || assessmentsObj[c.spId] || {};
+    return { check: c, status: a.status || 'none', riskScore: riskOrder[c.risk_level||'Medium'] || 2 };
+  }).filter(x => x.status === 'none' || x.status === 'review');
+
+  const bySection = {};
+  outstanding.forEach(x => {
+    const sec = x.check.section || 'Other';
+    if (!bySection[sec]) bySection[sec] = [];
+    bySection[sec].push(x);
+  });
+
+  const themes = Object.entries(bySection).map(([section, items]) => {
+    items.sort((a,b)=>b.riskScore-a.riskScore);
+    return { section, count: items.length, topItem: items[0].check, maxRisk: items[0].check.risk_level||'Medium', riskScore: items[0].riskScore };
+  });
+
+  themes.sort((a,b)=> b.riskScore - a.riskScore || b.count - a.count);
+  return themes.slice(0, count || 5);
 }
 
 function computeTopLists(checksArr, assessmentsObj) {
@@ -26044,7 +26083,7 @@ async function generateWordReport(score, noteConstraints, noteNext, lang, licens
     if (noteNext) children.push(new Paragraph({ spacing:{after:200}, children:[txt(`${L.nextSteps}: `,{bold:true,size:17,color:'1E40AF'}), txt(noteNext,{size:17,color:COLOR_PRIMARY})] }));
 
     // ── Table of Contents (Word auto-updates page numbers) ──
-    children.push(new Paragraph({ pageBreakBefore: true, heading: HeadingLevel.HEADING_1, spacing:{after:200}, children:[txt(L.toc,{size:30,bold:true,color:COLOR_DARK})] }));
+    children.push(new Paragraph({ spacing:{before:300,after:200}, heading: HeadingLevel.HEADING_1, children:[txt(L.toc,{size:26,bold:true,color:COLOR_DARK})] }));
     const { TableOfContents } = docx;
     if (TableOfContents) {
       children.push(new TableOfContents(L.toc, { hyperlink: true, headingStyleRange: '1-1' }));
@@ -26099,15 +26138,20 @@ async function generateWordReport(score, noteConstraints, noteNext, lang, licens
 
     // ── AREAS FOR IMPROVEMENT ──
     children.push(h1(L.secAreas));
+    children.push(bodyP(L.areasThemesIntro));
+    const areaThemesW = computeAreaThemes(checks, assessments, 5);
     const areasListW = computeAreasForImprovement(checks, assessments, 5);
-    if (areasListW.length===0) {
+    if (areaThemesW.length===0) {
       children.push(bodyP(L.noAreasFound, {italics:true,color:COLOR_GRAY}));
     } else {
-      areasListW.forEach((c,idx)=>{
-        const riskLevel = c.risk_level||'Medium';
-        children.push(new Paragraph({spacing:{after:100},children:[
-          txt(`${idx+1}. ${c.check_id} — ${c.title||''}   `,{bold:true,size:18}),
-          txt(riskLevel.toUpperCase(),{bold:true,size:16,color:riskColors[riskLevel]||riskColors.Medium})
+      areaThemesW.forEach((t,idx)=>{
+        children.push(new Paragraph({spacing:{after:20},children:[
+          txt(`${idx+1}. ${t.section}   `,{bold:true,size:18}),
+          txt(t.maxRisk.toUpperCase(),{bold:true,size:16,color:riskColors[t.maxRisk]||riskColors.Medium})
+        ]}));
+        children.push(new Paragraph({spacing:{after:110},indent:{left:240},children:[
+          txt(`${t.count} ${L.outstandingPoints}.  `,{size:17,color:COLOR_GRAY}),
+          txt(`${L.highestPriority}: ${t.topItem.check_id} — ${t.topItem.title||''}`,{size:17,color:COLOR_GRAY})
         ]}));
       });
     }
@@ -26200,7 +26244,7 @@ async function generateWordReport(score, noteConstraints, noteNext, lang, licens
 
         const discussCell = new TableCell({
           width:{size:headerCellWidths[4],type:WidthType.PERCENTAGE}, margins:{top:80,bottom:80,left:80,right:80},
-          children:[new Paragraph({children:[txt(comment ? comment.trim() : L.noComment,{size:16,italics:!comment,color:comment?COLOR_DARK:COLOR_GRAY})]})]
+          children:[new Paragraph({children:[txt(comment ? stripHtml(comment).trim() : L.noComment,{size:16,italics:!comment,color:comment?COLOR_DARK:COLOR_GRAY})]})]
         });
 
         tableRows.push(new TableRow({ children:[areaCell,controlCell,riskCell,impactCell,discussCell] }));
@@ -26338,7 +26382,7 @@ async function generatePDFWithMeta(score, noteConstraints, noteNext, lang, licen
     y += 34;
 
     // ══════════════════════════════════════════════════════════════
-    // Table of Contents — reserve page, fill in at the end
+    // Table of Contents — drawn on the same page as the cover (no blank page)
     // ══════════════════════════════════════════════════════════════
     const tocEntries = [];
     function startSection(label) {
@@ -26347,8 +26391,8 @@ async function generatePDFWithMeta(score, noteConstraints, noteNext, lang, licen
       tocEntries.push({ label, page: pageNum });
       return pageNum;
     }
-    newPage(); // reserved ToC page
     const tocPageNum = doc.internal.getNumberOfPages();
+    const tocStartY = y;
 
     // ── OVERVIEW ──
     startSection(L.secOverview);
@@ -26431,24 +26475,34 @@ async function generatePDFWithMeta(score, noteConstraints, noteNext, lang, licen
     // ── AREAS FOR IMPROVEMENT ──
     startSection(L.secAreas);
     doc.setFontSize(16); doc.setFont('helvetica','bold'); doc.setTextColor(29,78,216);
-    doc.text(L.secAreas, ml, y+6); y += 14;
+    doc.text(L.secAreas, ml, y+6); y += 13;
+    doc.setFontSize(8.5); doc.setFont('helvetica','normal'); doc.setTextColor(75,85,99);
+    const areasThemesIntroLines = doc.splitTextToSize(L.areasThemesIntro, cw);
+    chk(areasThemesIntroLines.length*4.1+6);
+    doc.text(areasThemesIntroLines, ml, y+3); y += areasThemesIntroLines.length*4.1+9;
+
+    const areaThemes = computeAreaThemes(checks, assessments, 5);
     const areasList = computeAreasForImprovement(checks, assessments, 5);
-    if (areasList.length===0) {
+    if (areaThemes.length===0) {
       doc.setFontSize(9); doc.setFont('helvetica','italic'); doc.setTextColor(107,114,128);
       doc.text(L.noAreasFound, ml, y+3); y += 10;
     } else {
-      areasList.forEach((c, idx)=>{
-        const riskLevel = c.risk_level||'Medium';
-        doc.setFontSize(9); doc.setFont('helvetica','bold'); doc.setTextColor(17,24,39);
-        const lines = doc.splitTextToSize(`${idx+1}. ${c.check_id} — ${c.title||''}`, cw-18);
-        chk(lines.length*4.3+2);
-        doc.text(lines, ml, y+3);
-        doc.setFontSize(7); doc.setFont('helvetica','bold'); doc.setTextColor(...(barColors[riskLevel]||barColors.Medium));
-        doc.text(riskLevel.toUpperCase(), pw-mr, y+3, {align:'right'});
-        y += lines.length*4.3+5;
+      areaThemes.forEach((t, idx)=>{
+        doc.setFontSize(9.5); doc.setFont('helvetica','bold'); doc.setTextColor(17,24,39);
+        const titleLines = doc.splitTextToSize(`${idx+1}. ${t.section}`, cw-30);
+        chk(titleLines.length*4.3+2);
+        doc.text(titleLines, ml, y+3);
+        doc.setFontSize(7); doc.setFont('helvetica','bold'); doc.setTextColor(...(barColors[t.maxRisk]||barColors.Medium));
+        doc.text(t.maxRisk.toUpperCase(), pw-mr, y+3, {align:'right'});
+        y += titleLines.length*4.3+1;
+        doc.setFontSize(8); doc.setFont('helvetica','normal'); doc.setTextColor(75,85,99);
+        const detailText = `${t.count} ${L.outstandingPoints}.  ${L.highestPriority}: ${t.topItem.check_id} — ${t.topItem.title||''}`;
+        const detailLines = doc.splitTextToSize(detailText, cw-4);
+        chk(detailLines.length*4.1+5);
+        doc.text(detailLines, ml+4, y+3); y += detailLines.length*4.1+6;
       });
     }
-    y += 6;
+    y += 4;
     chk(14);
     doc.setFontSize(11); doc.setFont('helvetica','bold'); doc.setTextColor(29,78,216);
     doc.text(L.impactRankingsTitle, ml, y+5); y += 10;
@@ -26543,7 +26597,7 @@ async function generatePDFWithMeta(score, noteConstraints, noteNext, lang, licen
         const controlLines = doc.splitTextToSize(c.title||'', colW[1]-4);
         const riskTextLines = doc.splitTextToSize(c.rationale_short ? c.rationale_short.trim() : (c.rationale ? c.rationale.trim() : L.noDescription), colW[2]-4);
         const impactTextLines = doc.splitTextToSize(c.impact_short ? c.impact_short.trim() : (c.impact ? c.impact.trim() : L.noDescription), colW[3]-4);
-        const discussLines = doc.splitTextToSize(comment ? comment.trim() : L.noComment, colW[4]-4);
+        const discussLines = doc.splitTextToSize(comment ? stripHtml(comment).trim() : L.noComment, colW[4]-4);
 
         const h1 = areaLines.length*lineH + 2;
         const h2 = (controlLines.length+1)*lineH + 2;
@@ -26633,11 +26687,11 @@ async function generatePDFWithMeta(score, noteConstraints, noteNext, lang, licen
 
     // ── Fill in Table of Contents ──
     doc.setPage(tocPageNum);
-    let tocY = 22;
-    doc.setFontSize(20); doc.setFont('helvetica','bold'); doc.setTextColor(17,24,39);
-    doc.text(L.toc, ml, tocY); tocY += 16;
+    let tocY = tocStartY + 12;
+    doc.setFontSize(15); doc.setFont('helvetica','bold'); doc.setTextColor(17,24,39);
+    doc.text(L.toc, ml, tocY); tocY += 12;
     tocEntries.forEach(entry=>{
-      doc.setFontSize(11); doc.setFont('helvetica','normal'); doc.setTextColor(31,41,55);
+      doc.setFontSize(10); doc.setFont('helvetica','normal'); doc.setTextColor(31,41,55);
       doc.text(entry.label, ml, tocY);
       const pageStr = String(entry.page);
       doc.setTextColor(107,114,128);
@@ -26651,7 +26705,7 @@ async function generatePDFWithMeta(score, noteConstraints, noteNext, lang, licen
         doc.line(dotsStart, tocY-1, dotsEnd, tocY-1);
         if (doc.setLineDashPattern) doc.setLineDashPattern([], 0);
       }
-      tocY += 11;
+      tocY += 9.5;
     });
 
     const pc=doc.internal.getNumberOfPages();
