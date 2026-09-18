@@ -25883,8 +25883,8 @@ const REPORT_LABELS = {
     recommendationsIntro: 'Baseret på de identificerede fund anbefales følgende tiltag prioriteret efter risiko.',
     conclusionText: 'Denne rapport giver et samlet billede af sikkerhedstilstanden i Microsoft 365-miljøet, vurderet op mod CIS Microsoft 365 Foundations Benchmark. De identificerede fund og anbefalinger bør danne grundlag for en prioriteret handlingsplan. ADDvision anbefaler løbende opfølgning og genvurdering, i takt med at både organisationen og trusselsbilledet udvikler sig.',
     areasThemesIntro: 'Herunder ses de områder hvor flest udestående punkter er identificeret, sorteret efter risikoniveau.',
-    outstandingPoints: 'udestående punkter',
-    highestPriority: 'Højeste prioritet',
+    outstandingPoints: 'indstilling bør forbedres',
+    outstandingPointsPlural: 'indstillinger bør forbedres',
     implementAction: 'Implementér',
     noAreasFound: 'Ingen kritiske forbedringspunkter fundet — alt væsentligt er på plads.'
   },
@@ -25905,8 +25905,8 @@ const REPORT_LABELS = {
     recommendationsIntro: 'Based on the findings identified, the following actions are recommended, prioritized by risk.',
     conclusionText: 'This report provides an overall picture of the security posture of the Microsoft 365 environment, assessed against the CIS Microsoft 365 Foundations Benchmark. The findings and recommendations identified should form the basis of a prioritized action plan. ADDvision recommends ongoing follow-up and reassessment as both the organization and the threat landscape evolve.',
     areasThemesIntro: 'The areas below have the highest number of outstanding points identified, sorted by risk level.',
-    outstandingPoints: 'outstanding points',
-    highestPriority: 'Highest priority',
+    outstandingPoints: 'setting should be improved',
+    outstandingPointsPlural: 'settings should be improved',
     implementAction: 'Implement',
     noAreasFound: 'No critical improvement points found — everything essential is in place.'
   }
@@ -25914,26 +25914,26 @@ const REPORT_LABELS = {
 
 const SCOPE_DOMAINS = {
   da: [
-    ['Adgangskontrol', 'Vurdering af mekanismer til at styre og begrænse adgang til ressourcer i organisationens digitale miljø.'],
-    ['Identitet og autentificering', 'Gennemgang af multifaktor-login og adgangspolitikker for at forhindre uautoriseret adgang.'],
-    ['Enhedssikkerhed', 'Vurdering af sikkerhedspolitikker for computere og mobile enheder der tilgår virksomhedens data.'],
-    ['E-mail og samarbejde', 'Gennemgang af beskyttelse mod phishing, spam og malware i Exchange, Teams og SharePoint.'],
-    ['Ekstern deling og gæsteadgang', 'Vurdering af hvordan data deles med eksterne parter og hvordan gæsteadgang styres.'],
-    ['Auditlog og overvågning', 'Gennemgang af logning og sporbarhed af aktiviteter i miljøet.'],
-    ['Databeskyttelse', 'Analyse af foranstaltninger mod uautoriseret videregivelse af følsomme oplysninger.'],
-    ['Administrative rettigheder', 'Vurdering af hvordan privilegerede roller tildeles og kontrolleres.'],
-    ['Sikker baseline', 'Vurdering af organisationens efterlevelse af anerkendte sikkerhedsstandarder (CIS Microsoft 365 Foundations Benchmark).'],
+    ['Microsoft 365 Admin Center', 'Grundlæggende organisationsindstillinger, brugerkonti og administratoradgang.'],
+    ['Microsoft Defender', 'Beskyttelse mod phishing, malware og spam i email og filer.'],
+    ['Microsoft Purview', 'Auditlog, databeskyttelse og forebyggelse af datalækage.'],
+    ['Microsoft Intune Admin Center', 'Sikkerhedskrav til computere og mobile enheder.'],
+    ['Microsoft Entra Admin Center', 'Login, multifaktor-godkendelse og adgangsstyring.'],
+    ['Exchange Admin Center', 'Sikkerhedsindstillinger for email og mailflow.'],
+    ['SharePoint Admin Center', 'Fildeling og ekstern adgang til dokumenter.'],
+    ['Microsoft Teams Admin Center', 'Sikkerhed omkring møder, chat og eksterne deltagere i Teams.'],
+    ['Microsoft Fabric', 'Adgang og datadeling i Power BI og Fabric.'],
   ],
   en: [
-    ['Access Control', 'Evaluation of the mechanisms in place to manage and restrict access to resources within the organization\u2019s digital environment.'],
-    ['Identity & Authentication', 'Review of multi-factor login and access policies to prevent unauthorized access.'],
-    ['Device Security', 'Assessment of security policies for computers and mobile devices accessing corporate data.'],
-    ['Email & Collaboration', 'Review of protection against phishing, spam, and malware across Exchange, Teams, and SharePoint.'],
-    ['External Sharing & Guest Access', 'Evaluation of how data is shared with external parties and how guest access is governed.'],
-    ['Audit Logging & Monitoring', 'Review of logging and traceability of activity across the environment.'],
-    ['Data Protection', 'Analysis of measures against unauthorized disclosure of sensitive information.'],
-    ['Administrative Privileges', 'Assessment of how privileged roles are assigned and controlled.'],
-    ['Secure Baseline', 'Assessment of the organization\u2019s adherence to recognized security standards (CIS Microsoft 365 Foundations Benchmark).'],
+    ['Microsoft 365 Admin Center', 'Core organizational settings, user accounts, and administrator access.'],
+    ['Microsoft Defender', 'Protection against phishing, malware, and spam in email and files.'],
+    ['Microsoft Purview', 'Audit logging, data protection, and data loss prevention.'],
+    ['Microsoft Intune Admin Center', 'Security requirements for computers and mobile devices.'],
+    ['Microsoft Entra Admin Center', 'Sign-in, multi-factor authentication, and access control.'],
+    ['Exchange Admin Center', 'Security settings for email and mail flow.'],
+    ['SharePoint Admin Center', 'File sharing and external access to documents.'],
+    ['Microsoft Teams Admin Center', 'Security around meetings, chat, and external participants in Teams.'],
+    ['Microsoft Fabric', 'Access and data sharing in Power BI and Fabric.'],
   ]
 };
 
@@ -26042,7 +26042,7 @@ async function generateWordReport(score, noteConstraints, noteNext, lang, licens
   try {
     lang = lang || 'da';
     const L = REPORT_LABELS[lang] || REPORT_LABELS.da;
-    const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, WidthType, ShadingType, VerticalAlign, HeadingLevel, AlignmentType, BorderStyle, PageOrientation, convertInchesToTwip } = docx;
+    const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, WidthType, ShadingType, VerticalAlign, HeadingLevel, AlignmentType, BorderStyle, PageOrientation, convertInchesToTwip, TableLayoutType } = docx;
 
     const COLOR_PRIMARY = '1D4ED8', COLOR_DARK = '111827', COLOR_GRAY = '6B7280', COLOR_ACCENT = '3B82F6';
     const riskColors = { Critical:'B91C1C', High:'C2410C', Medium:'B45309', Low:'15803D' };
@@ -26051,6 +26051,14 @@ async function generateWordReport(score, noteConstraints, noteNext, lang, licens
     const statusLabels = L.statusLabels;
 
     function txt(text, opts={}) { return new TextRun({ text: text||'', font:'Calibri', size: opts.size||18, color: opts.color||COLOR_DARK, bold: opts.bold||false, italics: opts.italics||false }); }
+    function noBorderTable(rows) {
+      return new Table({
+        width:{size:100,type:WidthType.PERCENTAGE},
+        layout: TableLayoutType ? TableLayoutType.FIXED : undefined,
+        borders:{top:{style:BorderStyle.NONE},bottom:{style:BorderStyle.NONE},left:{style:BorderStyle.NONE},right:{style:BorderStyle.NONE},insideHorizontal:{style:BorderStyle.NONE},insideVertical:{style:BorderStyle.NONE}},
+        rows
+      });
+    }
 
     const custName = selectedCustomer?.name || (lang==='en' ? 'Customer' : 'Kunden');
     const custNameUp = custName.toUpperCase();
@@ -26063,24 +26071,42 @@ async function generateWordReport(score, noteConstraints, noteNext, lang, licens
 
     const children = [];
 
-    // Header
-    children.push(new Paragraph({ spacing:{after:120}, children:[txt(L.title,{size:36,bold:true,color:COLOR_PRIMARY})] }));
-    children.push(new Paragraph({ spacing:{after:60}, children:[txt(`${L.customer}: ${custName}`,{size:20,color:COLOR_GRAY})] }));
-    children.push(new Paragraph({ spacing:{after:200}, children:[txt(`${L.generated}: ${new Date().toLocaleDateString(dateLocale,{day:'2-digit',month:'long',year:'numeric'})} · CIS M365 v7.0.0`,{size:18,color:COLOR_GRAY})] }));
+    // ── Cover banner (colored, mirrors the PDF header) ──
+    children.push(noBorderTable([new TableRow({ children:[ new TableCell({
+      width:{size:100,type:WidthType.PERCENTAGE},
+      shading:{fill:COLOR_PRIMARY, type:ShadingType.CLEAR},
+      margins:{top:320,bottom:320,left:320,right:320},
+      children:[
+        new Paragraph({ spacing:{after:140}, children:[txt(L.title,{size:38,bold:true,color:'FFFFFF'})] }),
+        new Paragraph({ spacing:{after:50}, children:[txt(`${L.customer}: ${custName}`,{size:20,color:'DBEAFE'})] }),
+        new Paragraph({ spacing:{after:0}, children:[txt(`${L.generated}: ${new Date().toLocaleDateString(dateLocale,{day:'2-digit',month:'long',year:'numeric'})} · CIS M365 v7.0.0`,{size:18,color:'DBEAFE'})] }),
+      ]
+    })]})]));
 
-    children.push(new Paragraph({ spacing:{after:60}, children:[
-      txt(`${L.overallStatus}:  `,{bold:true,size:18}), txt(`${pct}% (${done} / ${checks.length} ${L.assessed})   `,{size:18}),
-      ...(score ? [txt(`${L.secureScore}:  `,{bold:true,size:18}), txt(`${score}%`,{size:18})] : [])
-    ]}));
-    children.push(new Paragraph({ spacing:{after:60}, children:[
-      txt(`${counts.implemented} ${statusLabels.implemented}   `,{size:16,color:statusColors.implemented,bold:true}),
-      txt(`${counts.accepted} ${statusLabels.accepted}   `,{size:16,color:statusColors.accepted,bold:true}),
-      txt(`${counts.review} ${statusLabels.review}   `,{size:16,color:statusColors.review,bold:true}),
-      txt(`${counts.declined} ${statusLabels.declined}   `,{size:16,color:statusColors.declined,bold:true}),
-      txt(`${counts.none} ${statusLabels.none}`,{size:16,color:statusColors.none,bold:true}),
-    ]}));
-    if (noteConstraints) children.push(new Paragraph({ spacing:{after:40}, children:[txt(`${L.notes}: `,{bold:true,size:17,color:'92400E'}), txt(noteConstraints,{size:17,color:'5C2B0C'})] }));
-    if (noteNext) children.push(new Paragraph({ spacing:{after:200}, children:[txt(`${L.nextSteps}: `,{bold:true,size:17,color:'1E40AF'}), txt(noteNext,{size:17,color:COLOR_PRIMARY})] }));
+    // ── Summary box (light background, mirrors the PDF summary bar) ──
+    const summaryChildren = [
+      new Paragraph({ spacing:{after:120}, children:[
+        txt(`${L.overallStatus}:  `,{bold:true,size:19}), txt(`${pct}% (${done} / ${checks.length} ${L.assessed})`,{size:19}),
+        ...(score ? [txt(`      ${L.secureScore}:  `,{bold:true,size:19}), txt(`${score}%`,{size:19})] : [])
+      ]}),
+      new Paragraph({ spacing:{after: (noteConstraints||noteNext) ? 120 : 0}, children:[
+        txt('\u25CF ',{color:statusColors.implemented,size:16}), txt(`${counts.implemented} ${statusLabels.implemented}    `,{size:16,color:statusColors.implemented,bold:true}),
+        txt('\u25CF ',{color:statusColors.accepted,size:16}), txt(`${counts.accepted} ${statusLabels.accepted}    `,{size:16,color:statusColors.accepted,bold:true}),
+        txt('\u25CF ',{color:statusColors.review,size:16}), txt(`${counts.review} ${statusLabels.review}    `,{size:16,color:statusColors.review,bold:true}),
+        txt('\u25CF ',{color:statusColors.declined,size:16}), txt(`${counts.declined} ${statusLabels.declined}    `,{size:16,color:statusColors.declined,bold:true}),
+        txt('\u25CF ',{color:statusColors.none,size:16}), txt(`${counts.none} ${statusLabels.none}`,{size:16,color:statusColors.none,bold:true}),
+      ]}),
+    ];
+    if (noteConstraints) summaryChildren.push(new Paragraph({ spacing:{after:noteNext?60:0}, children:[txt(`${L.notes}: `,{bold:true,size:17,color:'92400E'}), txt(noteConstraints,{size:17,color:'5C2B0C'})] }));
+    if (noteNext) summaryChildren.push(new Paragraph({ spacing:{after:0}, children:[txt(`${L.nextSteps}: `,{bold:true,size:17,color:'1E40AF'}), txt(noteNext,{size:17,color:COLOR_PRIMARY})] }));
+
+    children.push(noBorderTable([new TableRow({ children:[ new TableCell({
+      width:{size:100,type:WidthType.PERCENTAGE},
+      shading:{fill:'F8F9FB', type:ShadingType.CLEAR},
+      margins:{top:220,bottom:220,left:320,right:320},
+      children: summaryChildren
+    })]})]));
+    children.push(new Paragraph({ spacing:{after:0} }));
 
     // ── Table of Contents (Word auto-updates page numbers) ──
     children.push(new Paragraph({ spacing:{before:300,after:200}, heading: HeadingLevel.HEADING_1, children:[txt(L.toc,{size:26,bold:true,color:COLOR_DARK})] }));
@@ -26089,7 +26115,7 @@ async function generateWordReport(score, noteConstraints, noteNext, lang, licens
       children.push(new TableOfContents(L.toc, { hyperlink: true, headingStyleRange: '1-1' }));
     }
 
-    function h1(text) { return new Paragraph({ pageBreakBefore:true, heading: HeadingLevel.HEADING_1, spacing:{after:160}, children:[txt(text,{size:28,bold:true,color:COLOR_PRIMARY})] }); }
+    function h1(text) { return new Paragraph({ pageBreakBefore:true, heading: HeadingLevel.HEADING_1, spacing:{after:160}, border:{bottom:{style:BorderStyle.SINGLE,size:4,color:'E5E7EB',space:6}}, children:[txt(text,{size:28,bold:true,color:COLOR_PRIMARY})] }); }
     function h2(text) { return new Paragraph({ spacing:{before:140,after:80}, children:[txt(text,{size:22,bold:true,color:COLOR_DARK})] }); }
     function bodyP(text, opts={}) { return new Paragraph({ spacing:{after:120}, children:[txt(text,{size:18,...opts})] }); }
 
@@ -26099,30 +26125,38 @@ async function generateWordReport(score, noteConstraints, noteNext, lang, licens
     overviewTextW.split('\n\n').forEach(p => children.push(bodyP(p)));
 
     children.push(h2(L.licenseSection));
-    children.push(bodyP(licenseText ? licenseText : L.noLicense, { italics: !licenseText, color: licenseText?COLOR_DARK:COLOR_GRAY }));
+    children.push(noBorderTable([new TableRow({ children:[ new TableCell({
+      width:{size:100,type:WidthType.PERCENTAGE},
+      shading:{fill:'F8F9FB', type:ShadingType.CLEAR},
+      margins:{top:160,bottom:160,left:220,right:220},
+      children:[ new Paragraph({ children:[txt(licenseText ? licenseText : L.noLicense, {size:18, italics: !licenseText, color: licenseText?COLOR_DARK:COLOR_GRAY})] }) ]
+    })]})]));
+    children.push(new Paragraph({ spacing:{after:100} }));
 
-    // Risk distribution chart (as a simple colored table since docx has no native bar chart)
+    // Risk distribution chart — real proportional colored bars via shaded table cells
     children.push(h2(L.riskChartTitle));
     const riskCountsW = {Critical:0,High:0,Medium:0,Low:0};
     checks.forEach(c=>{ riskCountsW[c.risk_level||'Medium']++; });
     const barColorsHex = {Critical:'B91C1C',High:'EA580C',Medium:'D97706',Low:'2563EB'};
     const maxRiskCountW = Math.max(...Object.values(riskCountsW),1);
+    // Proportional bar built from repeated block characters — empty shaded cells with fixed
+    // DXA/percentage widths are not reliably respected by Word/LibreOffice (they auto-fit
+    // to content regardless), so the bar's rendered length must be driven by real content.
+    const MAX_BLOCKS = 55;
     ['Critical','High','Medium','Low'].forEach(level=>{
       const count = riskCountsW[level];
-      const pctW = Math.round((count/maxRiskCountW)*100);
-      children.push(new Table({
-        width:{size:100,type:WidthType.PERCENTAGE},
-        borders:{top:{style:BorderStyle.NONE},bottom:{style:BorderStyle.NONE},left:{style:BorderStyle.NONE},right:{style:BorderStyle.NONE},insideHorizontal:{style:BorderStyle.NONE},insideVertical:{style:BorderStyle.NONE}},
-        rows:[new TableRow({children:[
-          new TableCell({width:{size:12,type:WidthType.PERCENTAGE},margins:{top:40,bottom:40},children:[new Paragraph({children:[txt(level,{size:17,bold:true})]})]}),
-          new TableCell({width:{size:78,type:WidthType.PERCENTAGE},margins:{top:40,bottom:40},shading:{fill:'F3F4F6',type:ShadingType.CLEAR},children:[new Paragraph({children:[
-            new TextRun({text:'\u2588'.repeat(Math.max(Math.round(pctW/3),1)), color:barColorsHex[level], size:15, font:'Calibri'})
-          ]})]}),
-          new TableCell({width:{size:10,type:WidthType.PERCENTAGE},margins:{top:40,bottom:40},children:[new Paragraph({children:[txt(String(count),{size:17,bold:true})]})]}),
-        ]})]
-      }));
+      const blocks = Math.max(Math.round((count/maxRiskCountW)*MAX_BLOCKS), count>0?1:0);
+      children.push(noBorderTable([new TableRow({children:[
+        new TableCell({width:{size:11,type:WidthType.PERCENTAGE},margins:{top:50,bottom:50},verticalAlign:VerticalAlign.CENTER,children:[new Paragraph({children:[txt(level,{size:17,bold:true})]})]}),
+        new TableCell({width:{size:89,type:WidthType.PERCENTAGE},margins:{top:50,bottom:50},verticalAlign:VerticalAlign.CENTER,children:[new Paragraph({children:[
+          new TextRun({text:'\u2588'.repeat(blocks), color:barColorsHex[level], size:14, font:'Calibri'}),
+          txt(`  ${count}`,{size:17,bold:true})
+        ]})]}),
+      ]})]));
+      children.push(new Paragraph({spacing:{after:30}}));
     });
-    children.push(new Paragraph({spacing:{after:200}}));
+    children.push(new Paragraph({spacing:{after:180}}));
+
 
     // ── SCOPE ──
     children.push(h1(L.secScope));
@@ -26150,8 +26184,7 @@ async function generateWordReport(score, noteConstraints, noteNext, lang, licens
           txt(t.maxRisk.toUpperCase(),{bold:true,size:16,color:riskColors[t.maxRisk]||riskColors.Medium})
         ]}));
         children.push(new Paragraph({spacing:{after:110},indent:{left:240},children:[
-          txt(`${t.count} ${L.outstandingPoints}.  `,{size:17,color:COLOR_GRAY}),
-          txt(`${L.highestPriority}: ${t.topItem.check_id} — ${t.topItem.title||''}`,{size:17,color:COLOR_GRAY})
+          txt(`${t.count} ${t.count===1 ? L.outstandingPoints : L.outstandingPointsPlural}.`,{size:17,color:COLOR_GRAY})
         ]}));
       });
     }
@@ -26496,7 +26529,7 @@ async function generatePDFWithMeta(score, noteConstraints, noteNext, lang, licen
         doc.text(t.maxRisk.toUpperCase(), pw-mr, y+3, {align:'right'});
         y += titleLines.length*4.3+1;
         doc.setFontSize(8); doc.setFont('helvetica','normal'); doc.setTextColor(75,85,99);
-        const detailText = `${t.count} ${L.outstandingPoints}.  ${L.highestPriority}: ${t.topItem.check_id} — ${t.topItem.title||''}`;
+        const detailText = `${t.count} ${t.count===1 ? L.outstandingPoints : L.outstandingPointsPlural}.`;
         const detailLines = doc.splitTextToSize(detailText, cw-4);
         chk(detailLines.length*4.1+5);
         doc.text(detailLines, ml+4, y+3); y += detailLines.length*4.1+6;
