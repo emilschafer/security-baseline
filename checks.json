@@ -1682,6 +1682,41 @@
     "impact_short": "Any devices without a compliance policy will be marked not compliant. Care should be taken to first deploy any new compliance policies with a Conditional Access (CA) policy that is in the Report-only state."
   },
   {
+    "check_id": "4.2",
+    "title": "Ensure device enrollment for personally owned devices is blocked by default",
+    "type": "Automated",
+    "section": "Microsoft Intune Admin Center",
+    "subsection": "Device Compliance",
+    "profiles": [
+      "E3 Level 1",
+      "E5 Level 1"
+    ],
+    "description": "Enrollment restrictions determine whether personally owned (BYOD) devices are permitted to enroll into Intune management, in addition to controlling which platforms and OS versions are allowed. The default enrollment restriction should block personally owned devices from enrolling unless there is a deliberate, approved business need to allow BYOD.",
+    "rationale": "Personally owned devices are typically not subject to the same level of organizational control as corporate-owned devices, and often lack consistent patching, disk encryption, and endpoint protection. Allowing unrestricted BYOD enrollment by default increases the attack surface and the risk that organizational data is accessed from an unmanaged or insecure device. Blocking personal device enrollment by default forces a deliberate decision before BYOD access is granted.",
+    "impact": "Employees using personal devices will not be able to enroll them into Intune management until an administrator explicitly permits it for a specific group. This may require a defined BYOD policy and communication to staff who currently rely on personal devices for work.",
+    "audit_ui": [
+      "Navigate to Microsoft Intune admin center https://intune.microsoft.com/",
+      "Select Devices > Enrollment device platform restrictions",
+      "Select the Default restriction for each platform (Windows, iOS/iPadOS, Android, macOS)",
+      "Verify 'Personally owned devices' is set to Block"
+    ],
+    "audit_ps": "",
+    "remediation": [
+      "Navigate to Microsoft Intune admin center https://intune.microsoft.com/",
+      "Select Devices > Enrollment device platform restrictions",
+      "Select the Default restriction for each platform",
+      "Set 'Personally owned devices' to Block",
+      "Click Save",
+      "If BYOD is required for specific groups, create a separate, scoped restriction policy assigned only to the approved group"
+    ],
+    "sort_order": 42,
+    "archived": false,
+    "risk_level": "High",
+    "impact_level": "Medium",
+    "rationale_short": "Personally owned devices typically lack consistent patching, disk encryption, and endpoint protection. Blocking personal device enrollment by default forces a deliberate decision before BYOD access is granted, rather than leaving it open by default.",
+    "impact_short": "Employees using personal devices will not be able to enroll them into Intune management until an administrator explicitly permits it for a specific group."
+  },
+  {
     "check_id": "5.1.2.1",
     "title": "Ensure 'Per-user MFA' is disabled",
     "type": "Manual",
