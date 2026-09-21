@@ -24516,6 +24516,28 @@ async function runAutomatedReview() {
           detail = 'Kræver Intune licens - verificer i Intune admin center';
         }
       }
+      else if (c.check_id === '4.2') {
+        const enrollConfigs = await callReviewGraph('/deviceManagement/deviceEnrollmentConfigurations').catch(() => null);
+        if (enrollConfigs?.value) {
+          const platformRestrictions = enrollConfigs.value.filter(cfg => cfg['@odata.type']?.includes('PlatformRestriction'));
+          const defaultConfig = platformRestrictions.find(cfg => cfg.priority === 0 || cfg.displayName?.toLowerCase().includes('default')) || platformRestrictions[0];
+          if (defaultConfig) {
+            const platforms = ['iosRestriction','windowsRestriction','androidRestriction','macOSRestriction','windowsMobileRestriction'];
+            const blockedFlags = platforms.map(p => defaultConfig[p]?.personalDeviceEnrollmentBlocked).filter(v => v !== undefined);
+            const allBlocked = blockedFlags.length > 0 && blockedFlags.every(v => v === true);
+            pass = blockedFlags.length > 0 ? allBlocked : null;
+            detail = blockedFlags.length === 0
+              ? 'Kunne ikke aflæse platformsrestriktioner - verificer manuelt'
+              : (allBlocked ? 'Personligt ejede enheder er blokeret som standard' : 'Personligt ejede enheder kan tilmeldes på mindst én platform - bør blokeres');
+          } else {
+            pass = null;
+            detail = 'Kunne ikke finde standard enrollment-restriktion - verificer manuelt';
+          }
+        } else {
+          pass = null;
+          detail = 'Kræver Intune licens - verificer i Intune admin center';
+        }
+      }
 
       // ── Section 5: Microsoft Entra ─────────────────────────────────────
       else if (c.check_id === '5.1.2.1') {
@@ -26042,7 +26064,7 @@ async function generateWordReport(score, noteConstraints, noteNext, lang, licens
   try {
     lang = lang || 'da';
     const L = REPORT_LABELS[lang] || REPORT_LABELS.da;
-    const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, WidthType, ShadingType, VerticalAlign, HeadingLevel, AlignmentType, BorderStyle, PageOrientation, convertInchesToTwip, TableLayoutType } = docx;
+    const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, WidthType, ShadingType, VerticalAlign, HeadingLevel, AlignmentType, BorderStyle, PageOrientation, convertInchesToTwip, TableLayoutType, Footer, PageNumber } = docx;
 
     const COLOR_PRIMARY = '1D4ED8', COLOR_DARK = '111827', COLOR_GRAY = '6B7280', COLOR_ACCENT = '3B82F6';
     const riskColors = { Critical:'B91C1C', High:'C2410C', Medium:'B45309', Low:'15803D' };
@@ -26261,6 +26283,7 @@ async function generateWordReport(score, noteConstraints, noteNext, lang, licens
 
         const riskCell = new TableCell({
           width:{size:headerCellWidths[2],type:WidthType.PERCENTAGE}, margins:{top:80,bottom:80,left:80,right:80},
+          shading:{fill:'FEF2F2',type:ShadingType.CLEAR},
           children:[
             new Paragraph({spacing:{after:40},children:[txt(L.risk+': '+riskLevel.toUpperCase(),{bold:true,size:15,color:riskColors[riskLevel]||riskColors.Medium})]}),
             new Paragraph({children:[txt(c.rationale_short ? c.rationale_short.trim() : (c.rationale ? c.rationale.trim() : L.noDescription),{size:16})]})
@@ -26269,6 +26292,7 @@ async function generateWordReport(score, noteConstraints, noteNext, lang, licens
 
         const impactCell = new TableCell({
           width:{size:headerCellWidths[3],type:WidthType.PERCENTAGE}, margins:{top:80,bottom:80,left:80,right:80},
+          shading:{fill:'EFF6FF',type:ShadingType.CLEAR},
           children:[
             new Paragraph({spacing:{after:40},children:[txt(L.impact+': '+impactLevel.toUpperCase(),{bold:true,size:15,color:impactColors[impactLevel]||impactColors.Medium})]}),
             new Paragraph({children:[txt(c.impact_short ? c.impact_short.trim() : (c.impact ? c.impact.trim() : L.noDescription),{size:16})]})
@@ -26284,7 +26308,12 @@ async function generateWordReport(score, noteConstraints, noteNext, lang, licens
       }
     }
 
-    const table = new Table({ width:{size:100,type:WidthType.PERCENTAGE}, rows: tableRows });
+    const CELL_BORDER = { style:BorderStyle.SINGLE, size:2, color:'E5E7EB' };
+    const table = new Table({
+      width:{size:100,type:WidthType.PERCENTAGE},
+      borders:{ top:CELL_BORDER, bottom:CELL_BORDER, left:CELL_BORDER, right:CELL_BORDER, insideHorizontal:CELL_BORDER, insideVertical:CELL_BORDER },
+      rows: tableRows
+    });
     children.push(table);
 
     // ── STRATEGIC RECOMMENDATIONS ──
@@ -26311,6 +26340,20 @@ async function generateWordReport(score, noteConstraints, noteNext, lang, licens
             size: { orientation: PageOrientation.LANDSCAPE },
             margin: { top: convertInchesToTwip(0.5), bottom: convertInchesToTwip(0.5), left: convertInchesToTwip(0.5), right: convertInchesToTwip(0.5) }
           }
+        },
+        footers: {
+          default: new Footer({
+            children: [ new Paragraph({
+              alignment: AlignmentType.CENTER,
+              border:{ top:{style:BorderStyle.SINGLE,size:2,color:'E5E7EB',space:6} },
+              children: [
+                txt(`${L.title} · ${custName} · ${lang==='en'?'Confidential':'Fortroligt'} · ${lang==='en'?'Page':'Side'} `, {size:15, color:COLOR_GRAY}),
+                new TextRun({ children:[PageNumber.CURRENT], font:'Calibri', size:15, color:COLOR_GRAY }),
+                txt(` ${lang==='en'?'of':'af'} `, {size:15, color:COLOR_GRAY}),
+                new TextRun({ children:[PageNumber.TOTAL_PAGES], font:'Calibri', size:15, color:COLOR_GRAY }),
+              ]
+            }) ]
+          })
         },
         children
       }]
@@ -27183,7 +27226,7 @@ initMsal();
     </div>
     <div class="modal-body" id="review-body" style="flex:1;overflow-y:auto;padding:0;">
       <div id="review-login-step" style="padding:20px;">
-        <p style="margin-bottom:12px;color:var(--text2);">Log ind med kundens Global Administrator-konto for at starte automatisk gennemgang af alle 156 baseline punkter.</p>
+        <p style="margin-bottom:12px;color:var(--text2);">Log ind med kundens Global Administrator-konto for at starte automatisk gennemgang af alle 157 baseline punkter.</p>
         <div style="background:var(--surface2);border-radius:var(--radius);padding:12px 16px;margin-bottom:16px;font-size:13px;">
           <strong>Kunde:</strong> <span id="review-customer-name"></span>
         </div>
@@ -27193,7 +27236,7 @@ initMsal();
         <div style="margin-bottom:16px;">
           <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
             <span style="font-size:13px;font-weight:500;" id="review-current-check">Starter...</span>
-            <span style="font-size:13px;color:var(--text2);" id="review-count">0 / 156</span>
+            <span style="font-size:13px;color:var(--text2);" id="review-count">0 / 157</span>
           </div>
           <div style="background:var(--surface2);border-radius:99px;height:6px;overflow:hidden;">
             <div id="review-progress-bar" style="height:100%;background:var(--accent);border-radius:99px;width:0%;transition:width .3s;"></div>
