@@ -26146,8 +26146,8 @@ async function generateWordReport(score, noteConstraints, noteNext, lang, licens
       children.push(new TableOfContents(L.toc, { hyperlink: true, headingStyleRange: '1-1' }));
     }
 
-    function h1(text) { return new Paragraph({ pageBreakBefore:true, heading: HeadingLevel.HEADING_1, spacing:{after:160}, border:{bottom:{style:BorderStyle.SINGLE,size:4,color:'E5E7EB',space:6}}, children:[txt(text,{size:28,bold:true,color:COLOR_PRIMARY})] }); }
-    function h2(text) { return new Paragraph({ spacing:{before:140,after:80}, children:[txt(text,{size:22,bold:true,color:COLOR_DARK})] }); }
+    function h1(text) { return new Paragraph({ pageBreakBefore:true, heading: HeadingLevel.HEADING_1, spacing:{after:160}, keepNext:true, border:{bottom:{style:BorderStyle.SINGLE,size:4,color:'E5E7EB',space:6}}, children:[txt(text,{size:28,bold:true,color:COLOR_PRIMARY})] }); }
+    function h2(text) { return new Paragraph({ spacing:{before:140,after:80}, keepNext:true, children:[txt(text,{size:22,bold:true,color:COLOR_DARK})] }); }
     function bodyP(text, opts={}) { return new Paragraph({ spacing:{after:120}, children:[txt(text,{size:18,...opts})] }); }
 
     // ── OVERVIEW ──
@@ -26210,7 +26210,7 @@ async function generateWordReport(score, noteConstraints, noteNext, lang, licens
       children.push(bodyP(L.noAreasFound, {italics:true,color:COLOR_GRAY}));
     } else {
       areaThemesW.forEach((t,idx)=>{
-        children.push(new Paragraph({spacing:{after:20},children:[
+        children.push(new Paragraph({spacing:{after:20},keepNext:true,children:[
           txt(`${idx+1}. ${t.section}   `,{bold:true,size:18}),
           txt(t.maxRisk.toUpperCase(),{bold:true,size:16,color:riskColors[t.maxRisk]||riskColors.Medium})
         ]}));
@@ -26234,10 +26234,10 @@ async function generateWordReport(score, noteConstraints, noteNext, lang, licens
     children.push(bodyP(L.keyFindingsIntro));
     areasListW.forEach((c,idx)=>{
       const explain = c.impact_short || c.rationale_short || '';
-      children.push(new Paragraph({spacing:{after:20},children:[txt(`${idx+1}. ${c.check_id} — ${c.title||''}`,{bold:true,size:18})]}));
+      children.push(new Paragraph({spacing:{after:20},keepNext:true,children:[txt(`${idx+1}. ${c.check_id} — ${c.title||''}`,{bold:true,size:18})]}));
       if (explain) children.push(new Paragraph({spacing:{after:120},indent:{left:240},children:[txt(explain,{size:17,color:COLOR_GRAY})]}));
     });
-    children.push(new Paragraph({spacing:{before:120,after:80},children:[txt(lang==='en'?'Findings Overview':'Detaljeret gennemgang',{size:22,bold:true,color:COLOR_DARK})]}));
+    children.push(new Paragraph({spacing:{before:120,after:80},keepNext:true,children:[txt(lang==='en'?'Findings Overview':'Detaljeret gennemgang',{size:22,bold:true,color:COLOR_DARK})]}));
 
     // Table header row builder
     const headerCellWidths = [13,19,26,26,16];
@@ -26258,7 +26258,7 @@ async function generateWordReport(score, noteConstraints, noteNext, lang, licens
     const tableRows = [headerRow()];
 
     for (const [secName, secChecks] of Object.entries(sections)) {
-      tableRows.push(new TableRow({ children: [new TableCell({
+      tableRows.push(new TableRow({ cantSplit:true, children: [new TableCell({
         columnSpan: 5, shading:{fill:'F3F4F6',type:ShadingType.CLEAR}, margins:{top:60,bottom:60,left:80,right:80},
         children:[new Paragraph({children:[txt(secName.toUpperCase(),{bold:true,size:16,color:'4B5563'})]})]
       })]}));
@@ -26313,7 +26313,7 @@ async function generateWordReport(score, noteConstraints, noteNext, lang, licens
           children:[new Paragraph({children:[txt(comment ? stripHtml(comment).trim() : L.noComment,{size:16,italics:!comment,color:comment?COLOR_DARK:COLOR_GRAY})]})]
         });
 
-        tableRows.push(new TableRow({ children:[areaCell,controlCell,riskCell,impactCell,discussCell] }));
+        tableRows.push(new TableRow({ cantSplit:true, children:[areaCell,controlCell,riskCell,impactCell,discussCell] }));
       }
     }
 
@@ -26494,12 +26494,11 @@ async function generatePDFWithMeta(score, noteConstraints, noteNext, lang, licen
     y += 4;
 
     // License subsection
-    chk(20);
+    const licenseLines = doc.splitTextToSize(licenseText ? licenseText : L.noLicense, cw);
+    chk(9 + licenseLines.length*4.2 + 6); // heading + text checked together so they never split across a page
     doc.setFontSize(11); doc.setFont('helvetica','bold'); doc.setTextColor(29,78,216);
     doc.text(L.licenseSection, ml, y+5); y += 9;
     doc.setFontSize(8); doc.setFont('helvetica', licenseText ? 'normal' : 'italic'); doc.setTextColor(licenseText?55:156, licenseText?65:163, licenseText?81:175);
-    const licenseLines = doc.splitTextToSize(licenseText ? licenseText : L.noLicense, cw);
-    chk(licenseLines.length*4.2+6);
     doc.text(licenseLines, ml, y+3);
     y += licenseLines.length*4.2 + 12;
 
@@ -26585,7 +26584,9 @@ async function generatePDFWithMeta(score, noteConstraints, noteNext, lang, licen
       });
     }
     y += 4;
-    chk(14);
+    const firstImpactDef = IMPACT_RANKING_DEFS[lang||'da'][0];
+    const firstImpactDefLines = firstImpactDef ? doc.splitTextToSize(firstImpactDef[1], cw-4) : [];
+    chk(14 + (firstImpactDef ? 6 + firstImpactDefLines.length*4.1 + 5 : 0)); // heading + first ranking item checked together
     doc.setFontSize(11); doc.setFont('helvetica','bold'); doc.setTextColor(29,78,216);
     doc.text(L.impactRankingsTitle, ml, y+5); y += 10;
     IMPACT_RANKING_DEFS[lang||'da'].forEach(([label, def])=>{
@@ -26606,12 +26607,11 @@ async function generatePDFWithMeta(score, noteConstraints, noteNext, lang, licen
     chk(findingsIntroLines.length*4.1+6);
     doc.text(findingsIntroLines, ml, y+3); y += findingsIntroLines.length*4.1+10;
 
-    chk(14);
+    let keyIntroLines = doc.splitTextToSize(L.keyFindingsIntro, cw);
+    chk(14 + keyIntroLines.length*4.1+4); // heading + intro checked together
     doc.setFontSize(12); doc.setFont('helvetica','bold'); doc.setTextColor(17,24,39);
     doc.text(L.secKeyFindings, ml, y+5); y += 9;
     doc.setFontSize(8.5); doc.setFont('helvetica','normal'); doc.setTextColor(75,85,99);
-    let keyIntroLines = doc.splitTextToSize(L.keyFindingsIntro, cw);
-    chk(keyIntroLines.length*4.1+4);
     doc.text(keyIntroLines, ml, y+3); y += keyIntroLines.length*4.1+7;
 
     areasList.forEach((c, idx)=>{
