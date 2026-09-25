@@ -679,7 +679,7 @@ body { font-family: 'DM Sans', system-ui, sans-serif; background: var(--bg); col
 .status-btn.sel-declined { background: var(--red-bg); color: var(--red); border-color: var(--red-border); }
 .status-btn.sel-review { background: var(--amber-bg); color: var(--amber); border-color: var(--amber-border); }
 .status-btn.sel-accepted { background: var(--blue-bg); color: var(--blue); border-color: var(--blue-border); }
-.comment-field { width: 100%; padding: 9px 12px; border: 1px solid var(--border); border-radius: var(--radius); font-size: 13px; color: var(--text); background: var(--surface2); outline: none; font-family: inherit; resize: vertical; min-height: 70px; line-height: 1.6; transition: border-color .15s; }
+.comment-field { width: 100%; padding: 9px 12px; border: 1px solid var(--border); border-radius: var(--radius); font-size: 13px; color: var(--text); background: var(--surface2); outline: none; font-family: inherit; resize: vertical; min-height: 120px; line-height: 1.6; transition: border-color .15s; }
 .comment-field:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(29,78,216,.08); background: var(--surface); }
 .save-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--green); margin-left: 8px; opacity: 0; transition: opacity .3s; }
 .save-dot.show { opacity: 1; }
@@ -763,7 +763,7 @@ tbody tr:hover td { background: var(--bg); }
   .save-dot { display: inline-block; width: 5px; height: 5px; border-radius: 50%; background: var(--green); margin-left: 8px; opacity: 0; transition: opacity .3s; }
   .save-dot.show { opacity: 1; }
   .status-actions-label { font-size: 11px; font-weight: 600; color: var(--text3); text-transform: uppercase; letter-spacing: .06em; }
-  .comment-field { width: 100%; padding: 8px 10px; border: 0.5px solid var(--border); border-radius: var(--radius); font-size: 13px; color: var(--text); background: var(--surface2); font-family: inherit; resize: none; min-height: 70px; outline: none; margin-top: 4px; }
+  .comment-field { width: 100%; padding: 8px 10px; border: 0.5px solid var(--border); border-radius: var(--radius); font-size: 13px; color: var(--text); background: var(--surface2); font-family: inherit; resize: vertical; min-height: 120px; outline: none; margin-top: 4px; }
   .comment-field:focus { border-color: var(--accent); }
 
 .modal-overlay { isolation: isolate; }
@@ -25780,7 +25780,7 @@ function renderCard(c) {
       var sl = {implemented:'Implemented',review:'Under review',accepted:'Accepted',declined:'Declined'};
       return '<button class="status-btn'+(a.status===s?' sel-'+s:'')+'" onclick="setStatus(\''+spId+'\',\''+s+'\')">'+sl[s]+'</button>';
     }).join('');
-    tabContent = '<div class="status-actions"><span class="status-actions-label">Status</span>'+statusBtns+'<span class="save-dot" id="dot-'+spId+'"></span></div><div class="section-label" style="margin-top:10px;">Kommentar</div><textarea class="comment-field" placeholder="Noter..." id="cmt-'+spId+'" onchange="setComment(\''+spId+'\',this.value)">'+(a.comment||'')+'</textarea>';
+    tabContent = '<div class="status-actions"><span class="status-actions-label">Status</span>'+statusBtns+'<span class="save-dot" id="dot-'+spId+'"></span></div><div class="section-label" style="margin-top:10px;">Kommentar</div><textarea class="comment-field" placeholder="Noter..." id="cmt-'+spId+'" oninput="autoGrowComment(this)" onchange="setComment(\''+spId+'\',this.value)">'+(a.comment||'')+'</textarea>';
   }
   return '<div class="check-card'+(isOpen?' is-open':'')+'" id="card-'+spId+'"><div class="check-header" onclick="toggleCard(\''+spId+'\')"><span class="check-num">'+c.check_id+'</span><span class="check-title">'+c.title+'</span><div class="tags">'+profileTags+typeTag+'</div><span class="status-pill s-'+a.status+'">'+labels[a.status]+'</span><span class="chevron'+(isOpen?' open':'')+'">&#9660;</span></div><div class="check-body'+(isOpen?' open':'')+'"><div style="display:flex;border-bottom:0.5px solid var(--border);background:var(--surface2);">'+tabBar+'</div><div style="padding:14px;">'+tabContent+'</div></div></div>';
 }
@@ -25797,7 +25797,11 @@ function setCardTab(spId, tab) {
 function toggleCard(spId) {
   openCard = openCard === spId ? null : spId;
   renderChecklist();
-  if (openCard) setTimeout(() => document.getElementById('card-'+openCard)?.scrollIntoView({behavior:'smooth',block:'nearest'}), 50);
+  if (openCard) setTimeout(() => {
+    document.getElementById('card-'+openCard)?.scrollIntoView({behavior:'smooth',block:'nearest'});
+    const cmt = document.getElementById('cmt-'+openCard);
+    if (cmt) autoGrowComment(cmt);
+  }, 50);
 }
 
 async function setStatus(spId, status) {
@@ -25809,6 +25813,11 @@ async function setStatus(spId, status) {
   renderChecklist();
   openCard = spId;
   await saveAssessment(spId);
+}
+
+function autoGrowComment(el) {
+  el.style.height = 'auto';
+  el.style.height = (el.scrollHeight + 2) + 'px';
 }
 
 async function setComment(spId, val) {
@@ -26523,13 +26532,12 @@ async function generatePDFWithMeta(score, noteConstraints, noteNext, lang, licen
     doc.setFontSize(16); doc.setFont('helvetica','bold'); doc.setTextColor(29,78,216);
     doc.text(L.secScope, ml, y+6); y += 14;
     (SCOPE_DOMAINS[lang]||SCOPE_DOMAINS.da).forEach(([title, desc])=>{
-      doc.setFontSize(9); doc.setFont('helvetica','bold'); doc.setTextColor(17,24,39);
       const titleLines = doc.splitTextToSize(title, cw);
-      chk(titleLines.length*4.3+2);
+      const descLines = doc.splitTextToSize(desc, cw-4);
+      chk(titleLines.length*4.3+2 + descLines.length*4.1+5); // combined so title+description never split across a page
+      doc.setFontSize(9); doc.setFont('helvetica','bold'); doc.setTextColor(17,24,39);
       doc.text(titleLines, ml, y+3); y += titleLines.length*4.3+1;
       doc.setFontSize(8.5); doc.setFont('helvetica','normal'); doc.setTextColor(75,85,99);
-      const descLines = doc.splitTextToSize(desc, cw-4);
-      chk(descLines.length*4.1+5);
       doc.text(descLines, ml+2, y+3); y += descLines.length*4.1+6;
     });
 
@@ -26538,13 +26546,12 @@ async function generatePDFWithMeta(score, noteConstraints, noteNext, lang, licen
     doc.setFontSize(16); doc.setFont('helvetica','bold'); doc.setTextColor(29,78,216);
     doc.text(L.secMethodology, ml, y+6); y += 14;
     (METHODOLOGY_STEPS[lang]||METHODOLOGY_STEPS.da).forEach(([title, desc], idx)=>{
-      doc.setFontSize(9); doc.setFont('helvetica','bold'); doc.setTextColor(17,24,39);
       const titleLines = doc.splitTextToSize(`${idx+1}. ${title}`, cw);
-      chk(titleLines.length*4.3+2);
+      const descLines = doc.splitTextToSize(desc, cw-4);
+      chk(titleLines.length*4.3+2 + descLines.length*4.1+5);
+      doc.setFontSize(9); doc.setFont('helvetica','bold'); doc.setTextColor(17,24,39);
       doc.text(titleLines, ml, y+3); y += titleLines.length*4.3+1;
       doc.setFontSize(8.5); doc.setFont('helvetica','normal'); doc.setTextColor(75,85,99);
-      const descLines = doc.splitTextToSize(desc, cw-4);
-      chk(descLines.length*4.1+5);
       doc.text(descLines, ml+4, y+3); y += descLines.length*4.1+6;
     });
 
@@ -26564,17 +26571,16 @@ async function generatePDFWithMeta(score, noteConstraints, noteNext, lang, licen
       doc.text(L.noAreasFound, ml, y+3); y += 10;
     } else {
       areaThemes.forEach((t, idx)=>{
-        doc.setFontSize(9.5); doc.setFont('helvetica','bold'); doc.setTextColor(17,24,39);
         const titleLines = doc.splitTextToSize(`${idx+1}. ${t.section}`, cw-30);
-        chk(titleLines.length*4.3+2);
+        const detailText = `${t.count} ${t.count===1 ? L.outstandingPoints : L.outstandingPointsPlural}.`;
+        const detailLines = doc.splitTextToSize(detailText, cw-4);
+        chk(titleLines.length*4.3+2 + detailLines.length*4.1+5);
+        doc.setFontSize(9.5); doc.setFont('helvetica','bold'); doc.setTextColor(17,24,39);
         doc.text(titleLines, ml, y+3);
         doc.setFontSize(7); doc.setFont('helvetica','bold'); doc.setTextColor(...(barColors[t.maxRisk]||barColors.Medium));
         doc.text(t.maxRisk.toUpperCase(), pw-mr, y+3, {align:'right'});
         y += titleLines.length*4.3+1;
         doc.setFontSize(8); doc.setFont('helvetica','normal'); doc.setTextColor(75,85,99);
-        const detailText = `${t.count} ${t.count===1 ? L.outstandingPoints : L.outstandingPointsPlural}.`;
-        const detailLines = doc.splitTextToSize(detailText, cw-4);
-        chk(detailLines.length*4.1+5);
         doc.text(detailLines, ml+4, y+3); y += detailLines.length*4.1+6;
       });
     }
@@ -26583,12 +26589,11 @@ async function generatePDFWithMeta(score, noteConstraints, noteNext, lang, licen
     doc.setFontSize(11); doc.setFont('helvetica','bold'); doc.setTextColor(29,78,216);
     doc.text(L.impactRankingsTitle, ml, y+5); y += 10;
     IMPACT_RANKING_DEFS[lang||'da'].forEach(([label, def])=>{
+      const dLines = doc.splitTextToSize(def, cw-4);
+      chk(6 + dLines.length*4.1 + 5); // combined height for label + definition, checked together so they never split across a page
       doc.setFontSize(8.5); doc.setFont('helvetica','bold'); doc.setTextColor(...(barColors[label.charAt(0)+label.slice(1).toLowerCase()]||[55,65,81]));
-      chk(6);
       doc.text(label, ml, y+3); y += 5;
       doc.setFontSize(8); doc.setFont('helvetica','normal'); doc.setTextColor(75,85,99);
-      const dLines = doc.splitTextToSize(def, cw-4);
-      chk(dLines.length*4.1+5);
       doc.text(dLines, ml, y+2); y += dLines.length*4.1+6;
     });
 
@@ -26611,14 +26616,13 @@ async function generatePDFWithMeta(score, noteConstraints, noteNext, lang, licen
 
     areasList.forEach((c, idx)=>{
       const explain = c.impact_short || c.rationale_short || '';
-      doc.setFontSize(8.5); doc.setFont('helvetica','bold'); doc.setTextColor(17,24,39);
       const titleL = doc.splitTextToSize(`${idx+1}. ${c.check_id} — ${c.title||''}`, cw);
-      chk(titleL.length*4.2+2);
+      const expL = explain ? doc.splitTextToSize(explain, cw-4) : [];
+      chk(titleL.length*4.2+2 + (explain ? expL.length*4.1+5 : 3));
+      doc.setFontSize(8.5); doc.setFont('helvetica','bold'); doc.setTextColor(17,24,39);
       doc.text(titleL, ml, y+3); y += titleL.length*4.2+1;
       if (explain) {
         doc.setFontSize(8); doc.setFont('helvetica','normal'); doc.setTextColor(75,85,99);
-        const expL = doc.splitTextToSize(explain, cw-4);
-        chk(expL.length*4.1+5);
         doc.text(expL, ml+4, y+3); y += expL.length*4.1+5;
       } else { y += 3; }
     });
