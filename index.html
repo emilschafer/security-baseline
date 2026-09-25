@@ -26398,6 +26398,40 @@ async function generatePDFWithMeta(score, noteConstraints, noteNext, lang, licen
     const newPage=()=>{doc.addPage();y=15;};
     const chk=(n)=>{if(y+n>ph-16){newPage();return true;}return false;};
 
+    // Draws a bold title followed by body text, line by line. The title and the
+    // FIRST body line are always kept together (so a heading can never appear
+    // alone at the bottom of a page) — but if the body text is longer than one
+    // line, the remaining lines are allowed to flow naturally onto the next
+    // page instead of forcing the whole block to jump, which avoids leaving
+    // large unnecessary blank gaps.
+    function drawTitledBlock(opts) {
+      const { title, titleSize=9, titleColor=[17,24,39], titleIndent=0, titleWidth=cw,
+              body=[], bodySize=8, bodyColor=[75,85,99], bodyIndent=0, bodyWidth=cw,
+              titleLineH=4.3, bodyLineH=4.1, gapAfterTitle=1, gapAfterBlock=6, rightTag=null, rightTagColor=[0,0,0] } = opts;
+      const titleLines = title !== null ? doc.splitTextToSize(title, titleWidth) : [];
+      const bodyLines = typeof body === 'string' ? doc.splitTextToSize(body, bodyWidth) : body;
+      const firstBodyLineH = bodyLines.length ? bodyLineH : 0;
+      chk(titleLines.length*titleLineH + gapAfterTitle + firstBodyLineH);
+      if (titleLines.length) {
+        doc.setFontSize(titleSize); doc.setFont('helvetica','bold'); doc.setTextColor(...titleColor);
+        titleLines.forEach((tl, i) => {
+          if (i>0) chk(titleLineH);
+          doc.text(tl, ml+titleIndent, y+3);
+          if (i===0 && rightTag) { doc.setFontSize(7); doc.setFont('helvetica','bold'); doc.setTextColor(...rightTagColor); doc.text(rightTag, pw-mr, y+3, {align:'right'}); doc.setFontSize(titleSize); doc.setFont('helvetica','bold'); doc.setTextColor(...titleColor); }
+          y += titleLineH;
+        });
+        y += gapAfterTitle;
+      }
+      doc.setFontSize(bodySize); doc.setFont('helvetica','normal'); doc.setTextColor(...bodyColor);
+      bodyLines.forEach((line) => {
+        chk(bodyLineH);
+        doc.text(line, ml+bodyIndent, y+3);
+        y += bodyLineH;
+      });
+      y += gapAfterBlock;
+    }
+
+
     // Header
     doc.setFillColor(29,78,216); doc.rect(0,0,pw,40,'F');
     doc.setTextColor(255,255,255);
@@ -26494,13 +26528,11 @@ async function generatePDFWithMeta(score, noteConstraints, noteNext, lang, licen
     y += 4;
 
     // License subsection
-    const licenseLines = doc.splitTextToSize(licenseText ? licenseText : L.noLicense, cw);
-    chk(9 + licenseLines.length*4.2 + 6); // heading + text checked together so they never split across a page
-    doc.setFontSize(11); doc.setFont('helvetica','bold'); doc.setTextColor(29,78,216);
-    doc.text(L.licenseSection, ml, y+5); y += 9;
-    doc.setFontSize(8); doc.setFont('helvetica', licenseText ? 'normal' : 'italic'); doc.setTextColor(licenseText?55:156, licenseText?65:163, licenseText?81:175);
-    doc.text(licenseLines, ml, y+3);
-    y += licenseLines.length*4.2 + 12;
+    drawTitledBlock({
+      title: L.licenseSection, titleSize: 11, titleColor: [29,78,216], titleLineH: 9, gapAfterTitle: 0,
+      body: licenseText ? licenseText : L.noLicense, bodySize: 8,
+      bodyColor: licenseText ? [55,65,81] : [156,163,175], bodyWidth: cw, bodyLineH: 4.2, gapAfterBlock: 6
+    });
 
     // Risk distribution chart
     const riskCounts = {Critical:0,High:0,Medium:0,Low:0};
@@ -26531,13 +26563,10 @@ async function generatePDFWithMeta(score, noteConstraints, noteNext, lang, licen
     doc.setFontSize(16); doc.setFont('helvetica','bold'); doc.setTextColor(29,78,216);
     doc.text(L.secScope, ml, y+6); y += 14;
     (SCOPE_DOMAINS[lang]||SCOPE_DOMAINS.da).forEach(([title, desc])=>{
-      const titleLines = doc.splitTextToSize(title, cw);
-      const descLines = doc.splitTextToSize(desc, cw-4);
-      chk(titleLines.length*4.3+2 + descLines.length*4.1+5); // combined so title+description never split across a page
-      doc.setFontSize(9); doc.setFont('helvetica','bold'); doc.setTextColor(17,24,39);
-      doc.text(titleLines, ml, y+3); y += titleLines.length*4.3+1;
-      doc.setFontSize(8.5); doc.setFont('helvetica','normal'); doc.setTextColor(75,85,99);
-      doc.text(descLines, ml+2, y+3); y += descLines.length*4.1+6;
+      drawTitledBlock({
+        title, titleSize: 9, titleColor: [17,24,39], titleLineH: 4.3,
+        body: desc, bodySize: 8.5, bodyColor: [75,85,99], bodyIndent: 2, bodyWidth: cw-4, bodyLineH: 4.1, gapAfterTitle: 1, gapAfterBlock: 6
+      });
     });
 
     // ── METHODOLOGY ──
@@ -26545,13 +26574,10 @@ async function generatePDFWithMeta(score, noteConstraints, noteNext, lang, licen
     doc.setFontSize(16); doc.setFont('helvetica','bold'); doc.setTextColor(29,78,216);
     doc.text(L.secMethodology, ml, y+6); y += 14;
     (METHODOLOGY_STEPS[lang]||METHODOLOGY_STEPS.da).forEach(([title, desc], idx)=>{
-      const titleLines = doc.splitTextToSize(`${idx+1}. ${title}`, cw);
-      const descLines = doc.splitTextToSize(desc, cw-4);
-      chk(titleLines.length*4.3+2 + descLines.length*4.1+5);
-      doc.setFontSize(9); doc.setFont('helvetica','bold'); doc.setTextColor(17,24,39);
-      doc.text(titleLines, ml, y+3); y += titleLines.length*4.3+1;
-      doc.setFontSize(8.5); doc.setFont('helvetica','normal'); doc.setTextColor(75,85,99);
-      doc.text(descLines, ml+4, y+3); y += descLines.length*4.1+6;
+      drawTitledBlock({
+        title: `${idx+1}. ${title}`, titleSize: 9, titleColor: [17,24,39], titleLineH: 4.3,
+        body: desc, bodySize: 8.5, bodyColor: [75,85,99], bodyIndent: 4, bodyWidth: cw-4, bodyLineH: 4.1, gapAfterTitle: 1, gapAfterBlock: 6
+      });
     });
 
     // ── AREAS FOR IMPROVEMENT ──
@@ -26570,32 +26596,23 @@ async function generatePDFWithMeta(score, noteConstraints, noteNext, lang, licen
       doc.text(L.noAreasFound, ml, y+3); y += 10;
     } else {
       areaThemes.forEach((t, idx)=>{
-        const titleLines = doc.splitTextToSize(`${idx+1}. ${t.section}`, cw-30);
         const detailText = `${t.count} ${t.count===1 ? L.outstandingPoints : L.outstandingPointsPlural}.`;
-        const detailLines = doc.splitTextToSize(detailText, cw-4);
-        chk(titleLines.length*4.3+2 + detailLines.length*4.1+5);
-        doc.setFontSize(9.5); doc.setFont('helvetica','bold'); doc.setTextColor(17,24,39);
-        doc.text(titleLines, ml, y+3);
-        doc.setFontSize(7); doc.setFont('helvetica','bold'); doc.setTextColor(...(barColors[t.maxRisk]||barColors.Medium));
-        doc.text(t.maxRisk.toUpperCase(), pw-mr, y+3, {align:'right'});
-        y += titleLines.length*4.3+1;
-        doc.setFontSize(8); doc.setFont('helvetica','normal'); doc.setTextColor(75,85,99);
-        doc.text(detailLines, ml+4, y+3); y += detailLines.length*4.1+6;
+        drawTitledBlock({
+          title: `${idx+1}. ${t.section}`, titleSize: 9.5, titleColor: [17,24,39], titleWidth: cw-30, titleLineH: 4.3,
+          body: detailText, bodySize: 8, bodyColor: [75,85,99], bodyIndent: 4, bodyWidth: cw-4, bodyLineH: 4.1, gapAfterTitle: 1, gapAfterBlock: 6,
+          rightTag: t.maxRisk.toUpperCase(), rightTagColor: (barColors[t.maxRisk]||barColors.Medium)
+        });
       });
     }
     y += 4;
-    const firstImpactDef = IMPACT_RANKING_DEFS[lang||'da'][0];
-    const firstImpactDefLines = firstImpactDef ? doc.splitTextToSize(firstImpactDef[1], cw-4) : [];
-    chk(14 + (firstImpactDef ? 6 + firstImpactDefLines.length*4.1 + 5 : 0)); // heading + first ranking item checked together
+    chk(14);
     doc.setFontSize(11); doc.setFont('helvetica','bold'); doc.setTextColor(29,78,216);
     doc.text(L.impactRankingsTitle, ml, y+5); y += 10;
     IMPACT_RANKING_DEFS[lang||'da'].forEach(([label, def])=>{
-      const dLines = doc.splitTextToSize(def, cw-4);
-      chk(6 + dLines.length*4.1 + 5); // combined height for label + definition, checked together so they never split across a page
-      doc.setFontSize(8.5); doc.setFont('helvetica','bold'); doc.setTextColor(...(barColors[label.charAt(0)+label.slice(1).toLowerCase()]||[55,65,81]));
-      doc.text(label, ml, y+3); y += 5;
-      doc.setFontSize(8); doc.setFont('helvetica','normal'); doc.setTextColor(75,85,99);
-      doc.text(dLines, ml, y+2); y += dLines.length*4.1+6;
+      drawTitledBlock({
+        title: label, titleSize: 8.5, titleColor: (barColors[label.charAt(0)+label.slice(1).toLowerCase()]||[55,65,81]), titleLineH: 5,
+        body: def, bodySize: 8, bodyColor: [75,85,99], bodyWidth: cw-4, bodyLineH: 4.1, gapAfterTitle: 0, gapAfterBlock: 6
+      });
     });
 
     // ── FINDINGS ──
@@ -26616,15 +26633,11 @@ async function generatePDFWithMeta(score, noteConstraints, noteNext, lang, licen
 
     areasList.forEach((c, idx)=>{
       const explain = c.impact_short || c.rationale_short || '';
-      const titleL = doc.splitTextToSize(`${idx+1}. ${c.check_id} — ${c.title||''}`, cw);
-      const expL = explain ? doc.splitTextToSize(explain, cw-4) : [];
-      chk(titleL.length*4.2+2 + (explain ? expL.length*4.1+5 : 3));
-      doc.setFontSize(8.5); doc.setFont('helvetica','bold'); doc.setTextColor(17,24,39);
-      doc.text(titleL, ml, y+3); y += titleL.length*4.2+1;
-      if (explain) {
-        doc.setFontSize(8); doc.setFont('helvetica','normal'); doc.setTextColor(75,85,99);
-        doc.text(expL, ml+4, y+3); y += expL.length*4.1+5;
-      } else { y += 3; }
+      drawTitledBlock({
+        title: `${idx+1}. ${c.check_id} — ${c.title||''}`, titleSize: 8.5, titleColor: [17,24,39], titleLineH: 4.2,
+        body: explain, bodySize: 8, bodyColor: [75,85,99], bodyIndent: 4, bodyWidth: cw-4, bodyLineH: 4.1,
+        gapAfterTitle: 1, gapAfterBlock: explain ? 5 : 3
+      });
     });
     y += 6;
 
