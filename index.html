@@ -26120,7 +26120,7 @@ async function generateWordReport(score, noteConstraints, noteNext, lang, licens
         txt(`${L.overallStatus}:  `,{bold:true,size:19}), txt(`${pct}% (${done} / ${checks.length} ${L.assessed})`,{size:19}),
         ...(score ? [txt(`      ${L.secureScore}:  `,{bold:true,size:19}), txt(`${score}%`,{size:19})] : [])
       ]}),
-      new Paragraph({ spacing:{after: (noteConstraints||noteNext) ? 120 : 0}, children:[
+      new Paragraph({ spacing:{after:0}, children:[
         txt('\u25CF ',{color:statusColors.implemented,size:16}), txt(`${counts.implemented} ${statusLabels.implemented}    `,{size:16,color:statusColors.implemented,bold:true}),
         txt('\u25CF ',{color:statusColors.accepted,size:16}), txt(`${counts.accepted} ${statusLabels.accepted}    `,{size:16,color:statusColors.accepted,bold:true}),
         txt('\u25CF ',{color:statusColors.review,size:16}), txt(`${counts.review} ${statusLabels.review}    `,{size:16,color:statusColors.review,bold:true}),
@@ -26128,8 +26128,6 @@ async function generateWordReport(score, noteConstraints, noteNext, lang, licens
         txt('\u25CF ',{color:statusColors.none,size:16}), txt(`${counts.none} ${statusLabels.none}`,{size:16,color:statusColors.none,bold:true}),
       ]}),
     ];
-    if (noteConstraints) summaryChildren.push(new Paragraph({ spacing:{after:noteNext?60:0}, children:[txt(`${L.notes}: `,{bold:true,size:17,color:'92400E'}), txt(noteConstraints,{size:17,color:'5C2B0C'})] }));
-    if (noteNext) summaryChildren.push(new Paragraph({ spacing:{after:0}, children:[txt(`${L.nextSteps}: `,{bold:true,size:17,color:'1E40AF'}), txt(noteNext,{size:17,color:COLOR_PRIMARY})] }));
 
     children.push(noBorderTable([new TableRow({ children:[ new TableCell({
       width:{size:100,type:WidthType.PERCENTAGE},
@@ -26149,19 +26147,30 @@ async function generateWordReport(score, noteConstraints, noteNext, lang, licens
     function h1(text) { return new Paragraph({ pageBreakBefore:true, heading: HeadingLevel.HEADING_1, spacing:{after:160}, keepNext:true, border:{bottom:{style:BorderStyle.SINGLE,size:4,color:'E5E7EB',space:6}}, children:[txt(text,{size:28,bold:true,color:COLOR_PRIMARY})] }); }
     function h2(text) { return new Paragraph({ spacing:{before:140,after:80}, keepNext:true, children:[txt(text,{size:22,bold:true,color:COLOR_DARK})] }); }
     function bodyP(text, opts={}) { return new Paragraph({ spacing:{after:120}, children:[txt(text,{size:18,...opts})] }); }
+    function h1flow(text) { return new Paragraph({ heading: HeadingLevel.HEADING_1, keepNext:true, spacing:{before:320,after:160}, border:{bottom:{style:BorderStyle.SINGLE,size:4,color:'E5E7EB',space:6}}, children:[txt(text,{size:28,bold:true,color:COLOR_PRIMARY})] }); }
+    // One paragraph per line so line breaks typed in the app are kept in Word
+    function textParas(text, opts={}) { return String(text||'').split(/\r?\n/).map(line => new Paragraph({ spacing:{after:60}, children:[txt(line, {size:18, ...opts})] })); }
+    function shadedBox(text, opts={}) {
+      return noBorderTable([new TableRow({ children:[ new TableCell({
+        width:{size:100,type:WidthType.PERCENTAGE},
+        shading:{fill:'F8F9FB', type:ShadingType.CLEAR},
+        margins:{top:160,bottom:160,left:220,right:220},
+        children: textParas(text, opts)
+      })]})]);
+    }
 
     // ── OVERVIEW ──
     children.push(h1(L.secOverview));
     const overviewTextW = (OVERVIEW_TEXT[lang]||OVERVIEW_TEXT.da).replace(/\{CUSTOMER\}/g, custName);
     overviewTextW.split('\n\n').forEach(p => children.push(bodyP(p)));
 
+    if (noteConstraints) {
+      children.push(h2(L.notes));
+      children.push(shadedBox(noteConstraints));
+      children.push(new Paragraph({ spacing:{after:100} }));
+    }
     children.push(h2(L.licenseSection));
-    children.push(noBorderTable([new TableRow({ children:[ new TableCell({
-      width:{size:100,type:WidthType.PERCENTAGE},
-      shading:{fill:'F8F9FB', type:ShadingType.CLEAR},
-      margins:{top:160,bottom:160,left:220,right:220},
-      children:[ new Paragraph({ children:[txt(licenseText ? licenseText : L.noLicense, {size:18, italics: !licenseText, color: licenseText?COLOR_DARK:COLOR_GRAY})] }) ]
-    })]})]));
+    children.push(shadedBox(licenseText ? licenseText : L.noLicense, { italics: !licenseText, color: licenseText?COLOR_DARK:COLOR_GRAY }));
     children.push(new Paragraph({ spacing:{after:100} }));
 
     // Risk distribution chart — real proportional colored bars via shaded table cells
@@ -26189,6 +26198,22 @@ async function generateWordReport(score, noteConstraints, noteNext, lang, licens
     children.push(new Paragraph({spacing:{after:180}}));
 
 
+    // ── STRATEGIC RECOMMENDATIONS (placed right after the Overview) ──
+    const areasListW = computeAreasForImprovement(checks, assessments, 5);
+    children.push(h1flow(L.secRecommendations));
+    children.push(bodyP(L.recommendationsIntro));
+    areasListW.forEach((c,idx)=>{
+      const actionTitle = (c.title||'').replace(/^Ensure\s+(that\s+)?/i, '');
+      children.push(new Paragraph({spacing:{after:100}, keepLines:true, children:[
+        txt(`${idx+1}. ${c.check_id} — `,{bold:true,size:18}),
+        txt(`${L.implementAction}: ${actionTitle}`,{size:18})
+      ]}));
+    });
+    if (noteNext) {
+      children.push(h2(L.nextSteps));
+      children.push(shadedBox(noteNext));
+    }
+
     // ── SCOPE ──
     children.push(h1(L.secScope));
     (SCOPE_DOMAINS[lang]||SCOPE_DOMAINS.da).forEach(([title,desc])=>{
@@ -26205,7 +26230,6 @@ async function generateWordReport(score, noteConstraints, noteNext, lang, licens
     children.push(h1(L.secAreas));
     children.push(bodyP(L.areasThemesIntro));
     const areaThemesW = computeAreaThemes(checks, assessments, 5);
-    const areasListW = computeAreasForImprovement(checks, assessments, 5);
     if (areaThemesW.length===0) {
       children.push(bodyP(L.noAreasFound, {italics:true,color:COLOR_GRAY}));
     } else {
@@ -26325,17 +26349,6 @@ async function generateWordReport(score, noteConstraints, noteNext, lang, licens
     });
     children.push(table);
 
-    // ── STRATEGIC RECOMMENDATIONS ──
-    children.push(h1(L.secRecommendations));
-    children.push(bodyP(L.recommendationsIntro));
-    areasListW.forEach((c,idx)=>{
-      const actionTitle = (c.title||'').replace(/^Ensure\s+(that\s+)?/i, '');
-      children.push(new Paragraph({spacing:{after:100},children:[
-        txt(`${idx+1}. ${c.check_id} — `,{bold:true,size:18}),
-        txt(`${L.implementAction}: ${actionTitle}`,{size:18})
-      ]}));
-    });
-
     // ── CONCLUSION ──
     children.push(h1(L.secConclusion));
     children.push(bodyP(L.conclusionText));
@@ -26450,8 +26463,8 @@ async function generatePDFWithMeta(score, noteConstraints, noteNext, lang, licen
     y = 47;
 
     // Summary bar
-    doc.setFillColor(248,249,251); doc.rect(0,y-2,pw,32,'F');
-    doc.setDrawColor(229,231,235); doc.line(0,y+30,pw,y+30);
+    doc.setFillColor(248,249,251); doc.rect(0,y-2,pw,24,'F');
+    doc.setDrawColor(229,231,235); doc.line(0,y+22,pw,y+22);
     const counts = {implemented:0,review:0,accepted:0,declined:0,none:0};
     checks.forEach(c=>{const s=((assessments[c.check_id] || assessments[c.spId]) || {}).status||'none';counts[s]++;});
 
@@ -26483,22 +26496,7 @@ async function generatePDFWithMeta(score, noteConstraints, noteNext, lang, licen
       doc.text(p.l, px+4.3, y+7); px += doc.getTextWidth(p.l)+11;
     });
 
-    px = ml+92;
-    if(noteConstraints) {
-      doc.setFontSize(6.5);doc.setFont('helvetica','bold');doc.setTextColor(146,64,14);
-      doc.text(L.notes.toUpperCase()+':',px,y+15);
-      doc.setFont('helvetica','normal');doc.setTextColor(92,43,12);doc.setFontSize(7);
-      const l=doc.splitTextToSize(noteConstraints,cw-92-30)[0]||'';
-      doc.text(l,px+13,y+15);
-    }
-    if(noteNext) {
-      doc.setFontSize(6.5);doc.setFont('helvetica','bold');doc.setTextColor(30,64,175);
-      doc.text(L.nextSteps.toUpperCase()+':',px,y+20);
-      doc.setFont('helvetica','normal');doc.setTextColor(29,78,216);doc.setFontSize(7);
-      const l2=doc.splitTextToSize(noteNext,cw-92-30)[0]||'';
-      doc.text(l2,px+22,y+20);
-    }
-    y += 34;
+    y += 28;
 
     // ══════════════════════════════════════════════════════════════
     // Table of Contents — drawn on the same page as the cover (no blank page)
@@ -26510,8 +26508,16 @@ async function generatePDFWithMeta(score, noteConstraints, noteNext, lang, licen
       tocEntries.push({ label, page: pageNum });
       return pageNum;
     }
+    // Like startSection, but only moves to a new page if fewer than minSpace mm remain
+    function startSectionFlow(label, minSpace) {
+      chk(minSpace);
+      const pageNum = doc.internal.getNumberOfPages();
+      tocEntries.push({ label, page: pageNum });
+      return pageNum;
+    }
     const tocPageNum = doc.internal.getNumberOfPages();
     const tocStartY = y;
+    const areasList = computeAreasForImprovement(checks, assessments, 5);
 
     // ── OVERVIEW ──
     startSection(L.secOverview);
@@ -26526,6 +26532,14 @@ async function generatePDFWithMeta(score, noteConstraints, noteNext, lang, licen
       y += lines.length*4.3 + 5;
     });
     y += 4;
+
+    // Notes — moved out of the summary bar so the full text is shown (above the licence section)
+    if (noteConstraints) {
+      drawTitledBlock({
+        title: L.notes, titleSize: 11, titleColor: [29,78,216], titleLineH: 9, gapAfterTitle: 0,
+        body: noteConstraints, bodySize: 8, bodyColor: [55,65,81], bodyWidth: cw, bodyLineH: 4.2, gapAfterBlock: 6
+      });
+    }
 
     // License subsection
     drawTitledBlock({
@@ -26557,6 +26571,29 @@ async function generatePDFWithMeta(score, noteConstraints, noteNext, lang, licen
       y += 9;
     });
     y += 6;
+
+    // ── STRATEGIC RECOMMENDATIONS (placed right after the Overview) ──
+    y += 2;
+    startSectionFlow(L.secRecommendations, 42);
+    doc.setFontSize(16); doc.setFont('helvetica','bold'); doc.setTextColor(29,78,216);
+    doc.text(L.secRecommendations, ml, y+6); y += 13;
+    doc.setFontSize(8.5); doc.setFont('helvetica','normal'); doc.setTextColor(75,85,99);
+    const recIntroLines = doc.splitTextToSize(L.recommendationsIntro, cw);
+    doc.text(recIntroLines, ml, y+3); y += recIntroLines.length*4.1+8;
+    areasList.forEach((c, idx)=>{
+      const actionTitle = (c.title||'').replace(/^Ensure\s+(that\s+)?/i, '');
+      drawTitledBlock({
+        title: `${idx+1}. ${c.check_id} — ${L.implementAction}: ${actionTitle}`,
+        titleSize: 8.5, titleColor: [17,24,39], titleLineH: 4.2, body: [], gapAfterTitle: 0, gapAfterBlock: 4
+      });
+    });
+    if (noteNext) {
+      y += 3;
+      drawTitledBlock({
+        title: L.nextSteps, titleSize: 11, titleColor: [29,78,216], titleLineH: 9, gapAfterTitle: 0,
+        body: noteNext, bodySize: 8, bodyColor: [55,65,81], bodyWidth: cw, bodyLineH: 4.2, gapAfterBlock: 6
+      });
+    }
 
     // ── SCOPE ──
     startSection(L.secScope);
@@ -26590,7 +26627,6 @@ async function generatePDFWithMeta(score, noteConstraints, noteNext, lang, licen
     doc.text(areasThemesIntroLines, ml, y+3); y += areasThemesIntroLines.length*4.1+9;
 
     const areaThemes = computeAreaThemes(checks, assessments, 5);
-    const areasList = computeAreasForImprovement(checks, assessments, 5);
     if (areaThemes.length===0) {
       doc.setFontSize(9); doc.setFont('helvetica','italic'); doc.setTextColor(107,114,128);
       doc.text(L.noAreasFound, ml, y+3); y += 10;
@@ -26749,25 +26785,6 @@ async function generatePDFWithMeta(score, noteConstraints, noteNext, lang, licen
       }
       y += 3;
     }
-
-    // ── STRATEGIC RECOMMENDATIONS ──
-    startSection(L.secRecommendations);
-    doc.setFontSize(16); doc.setFont('helvetica','bold'); doc.setTextColor(29,78,216);
-    doc.text(L.secRecommendations, ml, y+6); y += 13;
-    doc.setFontSize(8.5); doc.setFont('helvetica','normal'); doc.setTextColor(75,85,99);
-    const recIntroLines = doc.splitTextToSize(L.recommendationsIntro, cw);
-    chk(recIntroLines.length*4.1+6);
-    doc.text(recIntroLines, ml, y+3); y += recIntroLines.length*4.1+10;
-
-    areasList.forEach((c, idx)=>{
-      const actionTitle = (c.title||'').replace(/^Ensure\s+(that\s+)?/i, '');
-      const actionText = `${L.implementAction}: ${actionTitle}`;
-      doc.setFontSize(8.5); doc.setFont('helvetica','bold'); doc.setTextColor(17,24,39);
-      const lines = doc.splitTextToSize(`${idx+1}. ${c.check_id} — ${actionText}`, cw);
-      chk(lines.length*4.2+5);
-      doc.text(lines, ml, y+3); y += lines.length*4.2+5;
-    });
-    y += 6;
 
     // ── CONCLUSION ──
     startSection(L.secConclusion);
