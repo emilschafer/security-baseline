@@ -79,7 +79,7 @@
     ],
     "sort_order": 1,
     "risk_level": "Critical",
-    "impact_level": "Medium",
+    "impact_level": "Low",
     "rationale_short": "In various situations, an organization may require the use of a break glass account to gain emergency access.",
     "impact_short": "Failure to properly implement emergency access accounts can weaken the security posture."
   },
