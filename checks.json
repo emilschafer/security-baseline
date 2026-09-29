@@ -203,7 +203,7 @@
     "sort_order": 4,
     "risk_level": "High",
     "impact_level": "Medium",
-    "rationale_short": "If group privacy is not controlled, any user may access sensitive information, depending on the group they try to access. When the privacy value of a group is set to \"Public,\" users may access data related to this group (e.g.",
+    "rationale_short": "If group privacy is not controlled, any user may access sensitive information, depending on the group they try to access.",
     "impact_short": "If the recommendation is applied, group owners could receive more access requests than usual, especially regarding groups originally meant to be public."
   },
   {
@@ -1713,8 +1713,8 @@
     "archived": false,
     "risk_level": "High",
     "impact_level": "Medium",
-    "rationale_short": "Personally owned devices typically lack consistent patching, disk encryption, and endpoint protection. Blocking personal device enrollment by default forces a deliberate decision before BYOD access is granted, rather than leaving it open by default.",
-    "impact_short": "Employees using personal devices will not be able to enroll them into Intune management until an administrator explicitly permits it for a specific group."
+    "rationale_short": "Personally owned devices are typically not subject to the same level of organizational control as corporate-owned devices, and often lack consistent patching, disk encryption, and endpoint protection.",
+    "impact_short": "Employees using personal devices will not be able to enroll them into Intune management until an administrator explicitly permits it for a specific group. This may require a defined BYOD policy and communication to staff who currently rely on personal devices for work."
   },
   {
     "check_id": "5.1.2.1",
@@ -1756,8 +1756,7 @@
       "2. Expand Entra ID > Users and select All users.",
       "3. Click on Per-user MFA on the top row.",
       "4. Click the empty box next to Display Name to select all accounts.",
-      "5. On the far right under quick steps click Disable.",
-      "Page 195"
+      "5. On the far right under quick steps click Disable."
     ],
     "sort_order": 42,
     "archived": false,
@@ -1804,8 +1803,7 @@
       "\"Policy.ReadWrite.Authorization\"",
       "2. Run the following commands:",
       "$param = @{ AllowedToCreateApps = $false }",
-      "Update-MgPolicyAuthorizationPolicy -DefaultUserRolePermissions $param",
-      "Page 198"
+      "Update-MgPolicyAuthorizationPolicy -DefaultUserRolePermissions $param"
     ],
     "sort_order": 43,
     "archived": false,
@@ -1816,7 +1814,7 @@
   },
   {
     "check_id": "5.1.2.3",
-    "title": "Ensure 'Restrict non-admin users from creating tenants' is",
+    "title": "Ensure 'Restrict non-admin users from creating tenants' is set to 'Yes'",
     "type": "Manual",
     "section": "Microsoft Entra Admin Center",
     "subsection": "Users",
@@ -1850,8 +1848,7 @@
       "2. Run the following commands:",
       "# Create hashtable and update the auth policy",
       "$params = @{ AllowedToCreateTenants = $false }",
-      "Update-MgPolicyAuthorizationPolicy -DefaultUserRolePermissions $params",
-      "Page 201"
+      "Update-MgPolicyAuthorizationPolicy -DefaultUserRolePermissions $params"
     ],
     "sort_order": 44,
     "archived": false,
@@ -1919,8 +1916,7 @@
       "1. Navigate to Microsoft Entra admin center https://entra.microsoft.com/.",
       "2. Expand Entra ID > Users and select User settings.",
       "3. Set Show keep user signed in to No.",
-      "4. Click Save.",
-      "Page 205"
+      "4. Click Save."
     ],
     "sort_order": 46,
     "archived": false,
@@ -2006,8 +2002,7 @@
       "AllowedToCreateSecurityGroups = $false",
       "}",
       "}",
-      "Update-MgPolicyAuthorizationPolicy -BodyParameter $params",
-      "Page 211"
+      "Update-MgPolicyAuthorizationPolicy -BodyParameter $params"
     ],
     "sort_order": 48,
     "archived": false,
@@ -2018,7 +2013,7 @@
   },
   {
     "check_id": "5.1.3.2",
-    "title": "Ensure that 'Restrict user ability to access groups features",
+    "title": "Ensure that 'Restrict user ability to access groups features in My Groups' is set to 'Yes'",
     "type": "Manual",
     "section": "Microsoft Entra Admin Center",
     "subsection": "Groups",
@@ -2036,8 +2031,7 @@
       "3. Under Self Service Group Management, verify that Restrict user ability",
       "to access groups features in My Groups. Group and User Admin will",
       "have read-only access when the value of this setting is 'Yes' is",
-      "set to Yes.",
-      "Page 213"
+      "set to Yes."
     ],
     "audit_ps": "",
     "remediation": [
@@ -2059,7 +2053,7 @@
   },
   {
     "check_id": "5.1.3.3",
-    "title": "Ensure that 'Owners can manage group membership",
+    "title": "Ensure that 'Owners can manage group membership requests in My Groups' is set to 'No'",
     "type": "Manual",
     "section": "Microsoft Entra Admin Center",
     "subsection": "Groups",
@@ -2082,7 +2076,6 @@
       "To remediate using the UI:",
       "1. Navigate to Microsoft Entra admin center https://entra.microsoft.com/.",
       "2. Expand Entra ID > Groups select General.",
-      "Page 215",
       "3. Set Owners can manage group membership requests in My Groups to No.",
       "4. Click Save."
     ],
@@ -2095,7 +2088,7 @@
   },
   {
     "check_id": "5.1.3.4",
-    "title": "Ensure that 'Users can create Microsoft 365 groups in",
+    "title": "Ensure that 'Users can create Microsoft 365 groups in Azure portals, API or PowerShell' is set to 'No'",
     "type": "Manual",
     "section": "Microsoft Entra Admin Center",
     "subsection": "Groups",
@@ -2138,8 +2131,7 @@
       "Note: If a group with the above templateId doesn't exist this means the defaults are",
       "present and it would be advisable to use the UI to remediate, as this will automatically",
       "create the Group.Unified object with its defaults. Microsoft's documentation does",
-      "cover using a POST request to build this using the API, however.",
-      "Page 218"
+      "cover using a POST request to build this using the API, however."
     ],
     "sort_order": 51,
     "archived": false,
@@ -2194,7 +2186,7 @@
   },
   {
     "check_id": "5.1.4.2",
-    "title": "Ensure the maximum number of devices per user is",
+    "title": "Ensure the maximum number of devices per user is limited",
     "type": "Manual",
     "section": "Microsoft Entra Admin Center",
     "subsection": "Devices",
@@ -2271,7 +2263,7 @@
   },
   {
     "check_id": "5.1.4.4",
-    "title": "Ensure local administrator assignment is limited during",
+    "title": "Ensure local administrator assignment is limited during Microsoft Entra join",
     "type": "Manual",
     "section": "Microsoft Entra Admin Center",
     "subsection": "Devices",
@@ -2307,8 +2299,7 @@
       "2. Expand Entra ID > Devices and select Device settings.",
       "3. Set Registering user is added as local administrator on the device",
       "during Microsoft Entra join (Preview) to Selected (and add members)",
-      "or None.",
-      "Page 230"
+      "or None."
     ],
     "sort_order": 55,
     "archived": false,
@@ -2358,7 +2349,7 @@
   },
   {
     "check_id": "5.1.4.6",
-    "title": "Ensure users are restricted from recovering BitLocker",
+    "title": "Ensure users are restricted from recovering BitLocker keys",
     "type": "Manual",
     "section": "Microsoft Entra Admin Center",
     "subsection": "Devices",
@@ -2409,7 +2400,7 @@
   },
   {
     "check_id": "5.1.5.1",
-    "title": "Ensure user consent to apps accessing company data on",
+    "title": "Ensure user consent to apps accessing company data on their behalf is not allowed",
     "type": "Manual",
     "section": "Microsoft Entra Admin Center",
     "subsection": "Enterprise Apps",
@@ -2443,8 +2434,7 @@
       "settings.",
       "4. Under User consent for applications select Do not allow user",
       "consent.",
-      "5. Click the Save option at the top of the window.",
-      "Page 240"
+      "5. Click the Save option at the top of the window."
     ],
     "sort_order": 58,
     "archived": false,
@@ -2492,8 +2482,7 @@
       "generated app consent requests.",
       "7. Set Selected users will receive email notifications for requests to",
       "Yes",
-      "8. Select Save at the top of the window.",
-      "Page 243"
+      "8. Select Save at the top of the window."
     ],
     "sort_order": 59,
     "archived": false,
@@ -2550,7 +2539,6 @@
       "▪ 0001-01-01T00:00:00Z (not configured)",
       "▪ A date that is on or before the date of the assessment.",
       "3. Compliance is met when all of the above conditions are satisfied.",
-      "Page 246",
       "Part 2: Audit service principal restrictions",
       "1. Under servicePrincipalRestrictions.passwordCredentials, locate the",
       "entry where restrictionType is passwordAddition.",
@@ -2579,7 +2567,6 @@
       "7. Set Only apply to apps created after to a desired date or leave it",
       "unconfigured.",
       "8. Select Save and close to apply the changes.",
-      "Page 247",
       "To remediate using the Microsoft Graph API:",
       "Important: The PATCH request replaces the passwordCredentials array in full.",
       "Retrieve the current policy first and include all existing entries in the request body to",
@@ -2601,8 +2588,7 @@
       "3. Execute a PATCH request to the same URI with the modified JSON in the request",
       "body to apply the changes.",
       "Note: The References section includes a link to the API documentation with full",
-      "remediation examples in multiple languages including HTTP, PowerShell, and Python.",
-      "Page 248"
+      "remediation examples in multiple languages including HTTP, PowerShell, and Python."
     ],
     "sort_order": 60,
     "archived": false,
@@ -2613,7 +2599,7 @@
   },
   {
     "check_id": "5.1.5.4",
-    "title": "Ensure password lifetime for applications does not exceed",
+    "title": "Ensure password lifetime for applications does not exceed 180 days",
     "type": "Manual",
     "section": "Microsoft Entra Admin Center",
     "subsection": "Enterprise Apps",
@@ -2661,7 +2647,6 @@
       "▪ 0001-01-01T00:00:00Z (not configured)",
       "▪ A date that is on or before the date of the assessment.",
       "3. Compliance is met when all of the above conditions are satisfied.",
-      "Page 251",
       "Part 2: Audit service principal restrictions",
       "1. Under servicePrincipalRestrictions.passwordCredentials, locate the",
       "entry where restrictionType is passwordLifetime.",
@@ -2692,7 +2677,6 @@
       "8. Set Only apply to apps created after to a desired date or leave it",
       "unconfigured.",
       "9. Select Save and close to apply the changes.",
-      "Page 252",
       "To remediate using the Microsoft Graph API:",
       "Important: The PATCH request replaces the passwordCredentials array in full.",
       "Retrieve the current policy first and include all existing entries in the request body to",
@@ -2718,8 +2702,7 @@
       "3. Execute a PATCH request to the same URI with the modified JSON in the request",
       "body to apply the changes.",
       "Note: The References section includes a link to the API documentation with full",
-      "remediation examples in multiple languages including HTTP, PowerShell, and Python.",
-      "Page 253"
+      "remediation examples in multiple languages including HTTP, PowerShell, and Python."
     ],
     "sort_order": 61,
     "archived": false,
@@ -2776,7 +2759,6 @@
       "▪ 0001-01-01T00:00:00Z (not configured)",
       "▪ A date that is on or before the date of the assessment.",
       "3. Compliance is met when all of the above conditions are satisfied.",
-      "Page 256",
       "Part 2: Audit service principal restrictions",
       "1. Under servicePrincipalRestrictions.passwordCredentials, locate the",
       "entry where restrictionType is customPasswordAddition.",
@@ -2805,7 +2787,6 @@
       "7. Set Only apply to apps created after to a desired date or leave it",
       "unconfigured.",
       "8. Select Save and close to apply the changes.",
-      "Page 257",
       "To remediate using the Microsoft Graph API:",
       "Important: The PATCH request replaces the passwordCredentials array in full.",
       "Retrieve the current policy first and include all existing entries in the request body to",
@@ -2829,8 +2810,7 @@
       "3. Execute a PATCH request to the same URI with the modified JSON in the request",
       "body to apply the changes.",
       "Note: The References section includes a link to the API documentation with full",
-      "remediation examples in multiple languages including HTTP, PowerShell, and Python.",
-      "Page 258"
+      "remediation examples in multiple languages including HTTP, PowerShell, and Python."
     ],
     "sort_order": 62,
     "archived": false,
@@ -2841,7 +2821,7 @@
   },
   {
     "check_id": "5.1.5.6",
-    "title": "Ensure maximum certificate lifetime for applications does",
+    "title": "Ensure maximum certificate lifetime for applications does not exceed 180 days",
     "type": "Manual",
     "section": "Microsoft Entra Admin Center",
     "subsection": "Enterprise Apps",
@@ -2889,7 +2869,6 @@
       "▪ 0001-01-01T00:00:00Z (not configured)",
       "▪ A date that is on or before the date of the assessment.",
       "3. Compliance is met when all of the above conditions are satisfied.",
-      "Page 261",
       "Part 2: Audit service principal restrictions",
       "1. Under servicePrincipalRestrictions.keyCredentials, locate the entry",
       "where restrictionType is asymmetricKeyLifetime.",
@@ -2920,7 +2899,6 @@
       "unconfigured.",
       "8. Set Maximum lifetime (in days) to 180 days or less.",
       "9. Select Save and close to apply the changes.",
-      "Page 262",
       "To remediate using the Microsoft Graph API:",
       "1. Execute a GET request to retrieve the current policy:",
       "v1.0/policies/defaultAppManagementPolicy",
@@ -2943,8 +2921,7 @@
       "3. Execute a PATCH request to the same URI with the modified JSON in the request",
       "body to apply the changes.",
       "Note: The References section includes a link to the API documentation with full",
-      "remediation examples in multiple languages including HTTP, PowerShell, and Python.",
-      "Page 263"
+      "remediation examples in multiple languages including HTTP, PowerShell, and Python."
     ],
     "sort_order": 63,
     "archived": false,
@@ -2955,7 +2932,7 @@
   },
   {
     "check_id": "5.1.6.1",
-    "title": "Ensure that collaboration invitations are sent to allowed",
+    "title": "Ensure that collaboration invitations are sent to allowed domains only",
     "type": "Manual",
     "section": "Microsoft Entra Admin Center",
     "subsection": "External Identities",
@@ -2979,7 +2956,7 @@
       "\"Policy.Read.All\"",
       "2. Run the following:"
     ],
-    "audit_ps": "$Uri = \"https://graph.microsoft.com/beta/legacy/policies\"\n$Response = (Invoke-MgGraphRequest -Uri $Uri).value |\nWhere-Object { $_.type -eq 'B2BManagementPolicy' }\nif ($Response) {\n$Definition = $Response.definition | ConvertFrom-Json\n$DomainsPolicy =\n$Definition.B2BManagementPolicy.InvitationsAllowedAndBlockedDomainsPolicy\n} else {\nWrite-Output \"No policy found.\"\nreturn\n}\n$DomainsPolicy\n3. Verify that the output includes an AllowedDomains property that either contains\nno domains or lists only organizationally approved domains. If a BlockedDomains\nproperty is present, the configuration is considered non-compliant.\nExample of a compliant output with AllowedDomains defined:\nAllowedDomains\n--------------\n{cisecurity.org, contoso.com, example.com}\nAllowed with no domains allowed (also compliant):\nAllowedDomains\n--------------\n{}\nPage 267",
+    "audit_ps": "$Uri = \"https://graph.microsoft.com/beta/legacy/policies\"\n$Response = (Invoke-MgGraphRequest -Uri $Uri).value |\nWhere-Object { $_.type -eq 'B2BManagementPolicy' }\nif ($Response) {\n$Definition = $Response.definition | ConvertFrom-Json\n$DomainsPolicy =\n$Definition.B2BManagementPolicy.InvitationsAllowedAndBlockedDomainsPolicy\n} else {\nWrite-Output \"No policy found.\"\nreturn\n}\n$DomainsPolicy\n3. Verify that the output includes an AllowedDomains property that either contains\nno domains or lists only organizationally approved domains. If a BlockedDomains\nproperty is present, the configuration is considered non-compliant.\nExample of a compliant output with AllowedDomains defined:\nAllowedDomains\n--------------\n{cisecurity.org, contoso.com, example.com}\nAllowed with no domains allowed (also compliant):\nAllowedDomains\n--------------\n{}",
     "remediation": [
       "To remediate using the UI:",
       "1. Navigate to Microsoft Entra admin center https://entra.microsoft.com/.",
@@ -3039,7 +3016,6 @@
       "o Guest user access is restricted to properties and",
       "memberships of their own directory objects (most",
       "restrictive)",
-      "Page 270",
       "To remediate using PowerShell:",
       "1. Connect to Microsoft Graph using Connect-MgGraph -Scopes",
       "\"Policy.ReadWrite.Authorization\"",
@@ -3064,7 +3040,7 @@
   },
   {
     "check_id": "5.1.6.3",
-    "title": "Ensure guest user invitations are limited",
+    "title": "Ensure guest user invitations are limited to the Guest Inviter role",
     "type": "Automated",
     "section": "Microsoft Entra Admin Center",
     "subsection": "External Identities",
@@ -3086,7 +3062,6 @@
       "users",
       "o No one in the organization can invite guest users including",
       "admins (most restrictive)",
-      "Page 272",
       "To audit using PowerShell:",
       "1. Connect to Microsoft Graph using Connect-MgGraph -Scopes",
       "\"Policy.Read.All\"",
@@ -3114,8 +3089,7 @@
       "Update-MgPolicyAuthorizationPolicy -AllowInvitesFrom 'adminsAndGuestInviters'",
       "To set to No one in the organization can invite guest users including",
       "admins (most restrictive):",
-      "Update-MgPolicyAuthorizationPolicy -AllowInvitesFrom \"none\"",
-      "Page 273"
+      "Update-MgPolicyAuthorizationPolicy -AllowInvitesFrom \"none\""
     ],
     "sort_order": 66,
     "archived": false,
@@ -3126,7 +3100,7 @@
   },
   {
     "check_id": "5.1.8.1",
-    "title": "Ensure that password hash sync is enabled for hybrid",
+    "title": "Ensure that password hash sync is enabled for hybrid deployments",
     "type": "Manual",
     "section": "Microsoft Entra Admin Center",
     "subsection": "Hybrid Management",
@@ -3166,7 +3140,7 @@
       "1. Open PowerShell on the on-premises server running Microsoft Entra Connect.",
       "2. Run the following cmdlet:"
     ],
-    "audit_ps": "Get-ADSyncAADCompanyFeature\n3. Verify that PasswordHashSync is True.\nPage 278",
+    "audit_ps": "Get-ADSyncAADCompanyFeature\n3. Verify that PasswordHashSync is True.",
     "remediation": [
       "To remediate using the on-prem Microsoft Entra Connect tool:",
       "1. Log in to the on premises server that hosts the Microsoft Entra Connect tool",
@@ -3191,7 +3165,7 @@
   },
   {
     "check_id": "5.2.2.1",
-    "title": "Ensure multifactor authentication is enabled for all users in",
+    "title": "Ensure multifactor authentication is enabled for all users in administrative roles",
     "type": "Manual",
     "section": "Microsoft Entra Admin Center",
     "subsection": "Conditional Access",
@@ -3236,8 +3210,7 @@
       "Authentication Strength configurations are inherently stronger than the built-in Require",
       "multifactor authentication control, the presence of a valid Authentication Strength also",
       "fulfills the MFA requirement for all users.",
-      "Note: A list of Directory roles can be found in the Remediation section.",
-      "Page 283"
+      "Note: A list of Directory roles can be found in the Remediation section."
     ],
     "audit_ps": "",
     "remediation": [
@@ -3276,8 +3249,7 @@
       "• Privileged role administrator",
       "• Security administrator",
       "• SharePoint administrator",
-      "• User administrator",
-      "Page 284"
+      "• User administrator"
     ],
     "sort_order": 68,
     "archived": false,
@@ -3313,7 +3285,6 @@
       "o Under Grant verify Grant Access and either Require multifactor",
       "authentication or Require authentication strength is checked.",
       "4. Verify that Enable policy is set to On.",
-      "Page 287",
       "To audit using the Microsoft Graph API:",
       "1. Execute a GET request to the following relative URI:",
       "v1.0/identity/conditionalAccess/policies",
@@ -3347,7 +3318,6 @@
       "ActiveSync clients and Other clients is checked.",
       "o Under Grant verify Block access is selected.",
       "4. Verify that Enable policy is set to On.",
-      "Page 291",
       "To audit using the Microsoft Graph API:",
       "1. Execute a GET request to the following relative URI:",
       "v1.0/identity/conditionalAccess/policies",
@@ -3383,7 +3353,6 @@
       "6. After allowing the policy to run in Report-only mode for at least one week,",
       "review the Sign-in logs for any unexpected impact, then return to the policy",
       "and set Enable policy to On.",
-      "Page 288",
       "To remediate using the UI:",
       "1. Navigate to the Microsoft Entra admin center https://entra.microsoft.com.",
       "2. Expand Entra ID > Conditional Access and select Policies.",
@@ -3396,8 +3365,7 @@
       "Exchange ActiveSync clients and Other clients.",
       "o Under Grant select Block Access.",
       "o Click Select.",
-      "4. Set the policy On and click Create.",
-      "Page 292"
+      "4. Set the policy On and click Create."
     ],
     "sort_order": 69,
     "archived": false,
@@ -3408,7 +3376,7 @@
   },
   {
     "check_id": "5.2.2.4",
-    "title": "Ensure Sign-in frequency is enabled and browser",
+    "title": "Ensure Sign-in frequency is enabled and browser sessions are not persistent for Administrative users",
     "type": "Manual",
     "section": "Microsoft Entra Admin Center",
     "subsection": "Conditional Access",
@@ -3458,7 +3426,6 @@
       "4. Compliance is met when at least one policy is found to meet all the criteria listed",
       "above.",
       "5. Verify that any exclusions are documented and reviewed annually.",
-      "Page 295",
       "Note: A list of directory roles applying to Administrators can be found in the remediation",
       "section."
     ],
@@ -3501,8 +3468,7 @@
       "• Privileged role administrator",
       "• Security administrator",
       "• SharePoint administrator",
-      "• User administrator",
-      "Page 296"
+      "• User administrator"
     ],
     "sort_order": 70,
     "archived": false,
@@ -3513,7 +3479,7 @@
   },
   {
     "check_id": "5.2.2.5",
-    "title": "Ensure 'Phishing-resistant MFA strength' is required for",
+    "title": "Ensure 'Phishing-resistant MFA strength' is required for Administrators",
     "type": "Manual",
     "section": "Microsoft Entra Admin Center",
     "subsection": "Conditional Access",
@@ -3543,7 +3509,6 @@
       "authentication strength is checked with Phishing-resistant MFA",
       "set as the value.",
       "4. Verify that Enable policy is set to On.",
-      "Page 299",
       "To audit using the Microsoft Graph API:",
       "1. Execute a GET request to the following relative URI:",
       "v1.0/identity/conditionalAccess/policies",
@@ -3594,7 +3559,6 @@
       "4. Compliance is met when at least one policy is found to meet all the criteria listed",
       "above.",
       "5. Verify that any exclusions are documented and reviewed annually.",
-      "Page 303",
       "Note: If the UserRiskLevels array includes medium or low, this still qualifies as",
       "compliant, as these enforcement levels are considered more strict. However, it must",
       "always include high; omitting this level would exclude users who are classified as high",
@@ -3636,7 +3600,6 @@
       "Note: If the SignInRiskLevels array includes low, this still qualifies as compliant, as",
       "these enforcement levels are considered more strict. However, it must always include",
       "high and medium; omitting these levels would exclude users who are classified as such.",
-      "Page 307",
       "Note 2: If GrantControls.BuiltInControls is block then the Grant and Session",
       "controls are considered satisfied, as this is considered a more strict enforcement of",
       "sign-in risk control."
@@ -3664,7 +3627,6 @@
       "and set Enable policy to On.",
       "Warning: Ensure administrators are pre-registered with strong authentication before",
       "enforcing the policy. After which the policy must be set to On.",
-      "Page 300",
       "At minimum these directory roles should be included for the policy:",
       "• Application administrator",
       "• Authentication administrator",
@@ -3701,7 +3663,6 @@
       "6. After allowing the policy to run in Report-only mode for at least one week,",
       "review the Sign-in logs for any unexpected impact, then return to the policy",
       "and set Enable policy to On.",
-      "Page 304",
       "To remediate using the UI:",
       "1. Navigate to the Microsoft Entra admin center https://entra.microsoft.com.",
       "2. Expand Entra ID > Conditional Access and select Policies.",
@@ -3773,8 +3734,7 @@
       "5. Verify that any exclusions are documented and reviewed annually.",
       "Note: If the SignInRiskLevels array includes low, this still qualifies as compliant, as",
       "these enforcement levels are considered more strict. However, it must always include",
-      "high and medium; omitting these levels would exclude users who are classified as such.",
-      "Page 311"
+      "high and medium; omitting these levels would exclude users who are classified as such."
     ],
     "audit_ps": "",
     "remediation": [
@@ -3849,8 +3809,7 @@
       "o State is enabled",
       "4. Compliance is met when at least one policy is found to meet all the criteria listed",
       "above.",
-      "5. Verify that any exclusions are documented and reviewed annually.",
-      "Page 315"
+      "5. Verify that any exclusions are documented and reviewed annually."
     ],
     "audit_ps": "",
     "remediation": [
@@ -3874,8 +3833,7 @@
       "review the Sign-in logs for any unexpected impact, then return to the policy",
       "and set Enable policy to On.",
       "Note: Guest user accounts, if collaborating with the organization, should be considered",
-      "when testing this policy.",
-      "Page 316"
+      "when testing this policy."
     ],
     "sort_order": 73,
     "archived": false,
@@ -3886,7 +3844,7 @@
   },
   {
     "check_id": "5.2.2.10",
-    "title": "Ensure a managed device is required to register security",
+    "title": "Ensure a managed device is required to register security information",
     "type": "Manual",
     "section": "Microsoft Entra Admin Center",
     "subsection": "Conditional Access",
@@ -3914,7 +3872,6 @@
       "Require Microsoft Entra hybrid joined device.",
       "o Verify Require one of the selected controls is selected.",
       "4. Verify that Enable policy is set to On.",
-      "Page 319",
       "To audit using the Microsoft Graph API:",
       "1. Execute a GET request to the following relative URI:",
       "v1.0/identity/conditionalAccess/policies",
@@ -3953,8 +3910,7 @@
       "5. Click Create.",
       "6. After allowing the policy to run in Report-only mode for at least one week,",
       "review the Sign-in logs for any unexpected impact, then return to the policy",
-      "and set Enable policy to On.",
-      "Page 320"
+      "and set Enable policy to On."
     ],
     "sort_order": 74,
     "archived": false,
@@ -3965,7 +3921,7 @@
   },
   {
     "check_id": "5.2.2.11",
-    "title": "Ensure sign-in frequency for Intune Enrollment is set to",
+    "title": "Ensure sign-in frequency for Intune Enrollment is set to 'Every time'",
     "type": "Manual",
     "section": "Microsoft Entra Admin Center",
     "subsection": "Conditional Access",
@@ -4013,8 +3969,7 @@
       "o State is enabled",
       "4. Compliance is met when at least one policy is found to meet all the criteria listed",
       "above.",
-      "5. Verify that any exclusions are documented and reviewed annually.",
-      "Page 323"
+      "5. Verify that any exclusions are documented and reviewed annually."
     ],
     "audit_ps": "",
     "remediation": [
@@ -4039,8 +3994,7 @@
       "5. Click Create.",
       "6. After allowing the policy to run in Report-only mode for at least one week,",
       "review the Sign-in logs for any unexpected impact, then return to the policy",
-      "and set Enable policy to On.",
-      "Page 324"
+      "and set Enable policy to On."
     ],
     "sort_order": 75,
     "archived": false,
@@ -4091,8 +4045,7 @@
       "o State is enabled",
       "4. Compliance is met when at least one policy is found to meet all the criteria listed",
       "above.",
-      "5. Verify that any exclusions are documented and reviewed annually.",
-      "Page 327"
+      "5. Verify that any exclusions are documented and reviewed annually."
     ],
     "audit_ps": "",
     "remediation": [
@@ -4123,7 +4076,7 @@
   },
   {
     "check_id": "5.2.2.13",
-    "title": "Ensure that periodic reauthentication is required for all",
+    "title": "Ensure that periodic reauthentication is required for all users",
     "type": "Manual",
     "section": "Microsoft Entra Admin Center",
     "subsection": "Conditional Access",
@@ -4148,7 +4101,6 @@
       "o Under Session ensure Sign-in frequency is checked, and Periodic",
       "reauthentication is set to 7 days or less.",
       "4. Verify that Enable policy is set to On.",
-      "Page 329",
       "To audit using the Microsoft Graph API:",
       "1. Execute a GET request to the following relative URI:",
       "v1.0/identity/conditionalAccess/policies",
@@ -4189,8 +4141,7 @@
       "5. Click Create.",
       "6. After allowing the policy to run in Report-only mode for at least one week,",
       "review the Sign-in logs for any unexpected impact, then return to the policy",
-      "and set Enable policy to On.",
-      "Page 330"
+      "and set Enable policy to On."
     ],
     "sort_order": 77,
     "archived": false,
@@ -4248,7 +4199,6 @@
       "9. Repeat steps 6 through 8 for each additional IP range.",
       "10. Select the Mark as trusted location checkbox.",
       "11. Once finished, click on Create.",
-      "Page 333",
       "Note: There is no single prescribed method for applying a named location to a",
       "Conditional Access policy, as the correct configuration depends on the specific access",
       "control requirements. Implementers should have a clear understanding of how named",
@@ -4263,7 +4213,7 @@
   },
   {
     "check_id": "5.2.2.15",
-    "title": "Ensure exclusionary geographic access controls are",
+    "title": "Ensure exclusionary geographic access controls are configured",
     "type": "Manual",
     "section": "Microsoft Entra Admin Center",
     "subsection": "Conditional Access",
@@ -4306,8 +4256,7 @@
       "o state is enabled",
       "3. Compliance is met when at least one policy is found to meet all the criteria listed",
       "above.",
-      "4. Verify that any exclusions are documented and reviewed annually.",
-      "Page 336"
+      "4. Verify that any exclusions are documented and reviewed annually."
     ],
     "audit_ps": "",
     "remediation": [
@@ -4390,7 +4339,6 @@
       "o conditions.platforms.includePlatforms contains windows",
       "o conditions.clientAppTypes is mobileAppsAndDesktopClients",
       "o sessionControls.secureSignInSession.isEnabled is true",
-      "Page 340",
       "o State is enabled",
       "4. Compliance is met when at least one policy is found to meet all the criteria listed",
       "above.",
@@ -4479,8 +4427,7 @@
       "o state is enabled",
       "4. Compliance is met when at least one policy is found to meet all the criteria listed",
       "above.",
-      "5. Verify that any exclusions are documented and reviewed annually.",
-      "Page 344"
+      "5. Verify that any exclusions are documented and reviewed annually."
     ],
     "audit_ps": "",
     "remediation": [
@@ -4512,7 +4459,7 @@
   },
   {
     "check_id": "5.2.3.1",
-    "title": "Ensure Microsoft Authenticator is configured to protect",
+    "title": "Ensure Microsoft Authenticator is configured to protect against MFA fatigue",
     "type": "Manual",
     "section": "Microsoft Entra Admin Center",
     "subsection": "Authentication Methods",
@@ -4558,8 +4505,7 @@
       "6. In each setting excludeTarget only includes a valid group (i.e. Break Glass",
       "accounts) or a target id of 00000000-0000-0000-0000-000000000000",
       "Note: Compliance cannot be easily validated for exclusions so adding these to a report",
-      "for human manual review is recommended. These should be reviewed annually.",
-      "Page 349"
+      "for human manual review is recommended. These should be reviewed annually."
     ],
     "audit_ps": "",
     "remediation": [
@@ -4626,8 +4572,7 @@
       "• Product names",
       "• Locations, such as company headquarters",
       "• Company-specific internal terms",
-      "• Abbreviations that have specific company meaning",
-      "Page 352"
+      "• Abbreviations that have specific company meaning"
     ],
     "sort_order": 83,
     "archived": false,
@@ -4638,7 +4583,7 @@
   },
   {
     "check_id": "5.2.3.3",
-    "title": "Ensure password protection is enabled for on-prem Active",
+    "title": "Ensure password protection is enabled for on-prem Active Directory",
     "type": "Manual",
     "section": "Microsoft Entra Admin Center",
     "subsection": "Authentication Methods",
@@ -4676,8 +4621,7 @@
       "2. Expand Entra ID > Authentication methods and select Password",
       "protection.",
       "3. Set Enable password protection on Windows Server Active Directory",
-      "to Yes and Mode to Enforced.",
-      "Page 357"
+      "to Yes and Mode to Enforced."
     ],
     "sort_order": 84,
     "archived": false,
@@ -4712,7 +4656,7 @@
       "\"UserAuthenticationMethod.Read.All,AuditLog.Read.All\"",
       "2. Run the following:"
     ],
-    "audit_ps": "Get-MgReportAuthenticationMethodUserRegistrationDetail `\n-Filter \"IsMfaCapable eq false and UserType eq 'Member'\" |\nft UserPrincipalName,IsMfaCapable,IsAdmin\n3. Verify that IsMfaCapable is set to True.\n4. Excluding any exceptions users found in this report may require remediation.\nNote: The CA rule must be in place for a successful deployment of Multifactor\nAuthentication. This policy is outlined in the conditional access section 5.2.2\nNote 2: Possible exceptions include on-premises synchronization accounts.\nPage 360",
+    "audit_ps": "Get-MgReportAuthenticationMethodUserRegistrationDetail `\n-Filter \"IsMfaCapable eq false and UserType eq 'Member'\" |\nft UserPrincipalName,IsMfaCapable,IsAdmin\n3. Verify that IsMfaCapable is set to True.\n4. Excluding any exceptions users found in this report may require remediation.\nNote: The CA rule must be in place for a successful deployment of Multifactor\nAuthentication. This policy is outlined in the conditional access section 5.2.2\nNote 2: Possible exceptions include on-premises synchronization accounts.",
     "remediation": [
       "Remediation steps will depend on the status of the personnel in question or",
       "configuration of Conditional Access policies and will not be covered in detail.",
@@ -4729,8 +4673,7 @@
       "Access > Policies)",
       "• Review the user account in Sign-in logs. Under the Activity Details pane",
       "click the Conditional Access tab to view applied policies.",
-      "Note: Conditional Access is covered step by step in section 5.2.2",
-      "Page 361"
+      "Note: Conditional Access is covered step by step in section 5.2.2"
     ],
     "sort_order": 85,
     "archived": false,
@@ -4763,8 +4706,7 @@
       "1. Connect to Graph using Connect-MgGraph -Scopes \"Policy.Read.All\"",
       "2. Run the following:",
       "(Get-MgPolicyAuthenticationMethodPolicy).AuthenticationMethodConfigurations",
-      "3. Verify that Sms and Voice are disabled.",
-      "Page 364"
+      "3. Verify that Sms and Voice are disabled."
     ],
     "audit_ps": "",
     "remediation": [
@@ -4788,8 +4730,7 @@
       "@{ Id = \"Voice\"; State = \"disabled\" }",
       ")",
       "Update-MgPolicyAuthenticationMethodPolicy -AuthenticationMethodConfigurations",
-      "$params",
-      "Page 365"
+      "$params"
     ],
     "sort_order": 86,
     "archived": false,
@@ -4800,7 +4741,7 @@
   },
   {
     "check_id": "5.2.3.6",
-    "title": "Ensure system-preferred multifactor authentication is",
+    "title": "Ensure system-preferred multifactor authentication is enabled",
     "type": "Manual",
     "section": "Microsoft Entra Admin Center",
     "subsection": "Authentication Methods",
@@ -4830,8 +4771,7 @@
       "2. Expand Entra ID > Authentication methods and select Settings.",
       "3. Set the System-preferred multifactor authentication State to Enabled and",
       "include All users.",
-      "4. Any users exclusions should be documented and reviewed annually.",
-      "Page 368"
+      "4. Any users exclusions should be documented and reviewed annually."
     ],
     "sort_order": 87,
     "archived": false,
@@ -4884,8 +4824,7 @@
       "@{ Id = \"Email\"; State = \"disabled\" }",
       ")",
       "Update-MgPolicyAuthenticationMethodPolicy -AuthenticationMethodConfigurations",
-      "$params",
-      "Page 371"
+      "$params"
     ],
     "sort_order": 88,
     "archived": false,
@@ -4930,8 +4869,7 @@
       "Note: In hybrid environments using pass-through authentication (PTA), Microsoft",
       "recommends to configure the AD DS account lockout threshold to be at least two to",
       "three times greater than the value set here to ensure Entra smart lockout activates",
-      "before AD DS lockout.",
-      "Page 374"
+      "before AD DS lockout."
     ],
     "sort_order": 89,
     "archived": false,
@@ -4942,7 +4880,7 @@
   },
   {
     "check_id": "5.2.3.9",
-    "title": "Ensure that Account 'Lockout duration in seconds' is at",
+    "title": "Ensure that Account 'Lockout duration in seconds' is at least '60'",
     "type": "Manual",
     "section": "Microsoft Entra Admin Center",
     "subsection": "Authentication Methods",
@@ -4977,8 +4915,7 @@
       "Note: In hybrid environments using pass-through authentication (PTA), ensure the AD",
       "DS account lockout duration is shorter than the value set here. The Entra lockout",
       "duration is configured in seconds while AD DS lockout duration is configured in minutes;",
-      "account for the unit difference when comparing the two values.",
-      "Page 377"
+      "account for the unit difference when comparing the two values."
     ],
     "sort_order": 90,
     "archived": false,
@@ -4989,7 +4926,7 @@
   },
   {
     "check_id": "5.2.3.10",
-    "title": "Ensure Microsoft Authenticator on companion",
+    "title": "Ensure Microsoft Authenticator on companion applications is disabled",
     "type": "Manual",
     "section": "Microsoft Entra Admin Center",
     "subsection": "Authentication Methods",
@@ -5102,7 +5039,7 @@
   },
   {
     "check_id": "5.2.4.3",
-    "title": "Ensure SSPR registration and authentication re-",
+    "title": "Ensure SSPR registration and authentication re-confirmation is configured",
     "type": "Manual",
     "section": "Microsoft Entra Admin Center",
     "subsection": "Password Reset",
@@ -5175,7 +5112,7 @@
   },
   {
     "check_id": "5.2.4.5",
-    "title": "Ensure all admins are notified when other admins reset",
+    "title": "Ensure all admins are notified when other admins reset their passwords",
     "type": "Manual",
     "section": "Microsoft Entra Admin Center",
     "subsection": "Password Reset",
@@ -5191,8 +5128,7 @@
       "1. Navigate to Microsoft Entra admin center https://entra.microsoft.com/.",
       "2. Expand Entra ID > Password reset and select Notifications.",
       "3. Verify that Notify all admins when other admins reset their",
-      "password? is set to Yes",
-      "Page 391"
+      "password? is set to Yes"
     ],
     "audit_ps": "",
     "remediation": [
@@ -5212,7 +5148,7 @@
   },
   {
     "check_id": "5.3.1",
-    "title": "Ensure privileged role assignments are activated and not",
+    "title": "Ensure privileged role assignments are activated and not permanent",
     "type": "Manual",
     "section": "Microsoft Entra Admin Center",
     "subsection": "ID Governance",
@@ -5259,7 +5195,6 @@
       "privileged role list's id to produce a list of privileged role assignment instances.",
       "4. For each privileged role assignment instance, verify the appropriate condition for",
       "the principal type:",
-      "Page 395",
       "o For users and groups (principal@odata.type is",
       "#microsoft.graph.user or #microsoft.graph.group), verify that",
       "assignmentType is Activated. An assignmentType of Assigned is",
@@ -5296,8 +5231,7 @@
       "Note: CIS Safeguard 6.8, Define and Maintain Role-Based Access Control,",
       "recommends reviewing access on a recurring schedule, at least annually and more",
       "frequently as needed. This practice is strongly encouraged for service principals when",
-      "defining time-bound assignments.",
-      "Page 396"
+      "defining time-bound assignments."
     ],
     "sort_order": 97,
     "archived": false,
@@ -5342,7 +5276,6 @@
       "▪ If reviewers don't respond is set to Remove access",
       "4. The control is compliant if there is at least one access review for guests that",
       "meets all criteria above.",
-      "Page 399",
       "To audit using the Microsoft Graph API:",
       "1. Execute a GET request to the following relative URI:",
       "v1.0/identityGovernance/accessReviews/definitions",
@@ -5363,8 +5296,7 @@
       "o settings.defaultDecision is Deny",
       "o settings.recurrence.range.type is noEnd",
       "4. The control is compliant if there is at least one access review for guests that",
-      "meets all criteria above.",
-      "Page 400"
+      "meets all criteria above."
     ],
     "audit_ps": "",
     "remediation": [
@@ -5401,8 +5333,7 @@
       "v1.0/identityGovernance/accessReviews/definitions",
       "The request body must include properties that satisfy the audit criteria above. The",
       "Graph API documentation provides complete sample request bodies in multiple",
-      "languages including HTTP, PowerShell, and Python. See Reference 3 for details.",
-      "Page 401"
+      "languages including HTTP, PowerShell, and Python. See Reference 3 for details."
     ],
     "sort_order": 98,
     "archived": false,
@@ -5449,7 +5380,6 @@
       "o Settings > When completed:",
       "▪ Auto apply results to resource is set to Enable",
       "▪ If reviewers don't respond is set to No change",
-      "Page 404",
       "To audit using the Microsoft Graph API:",
       "1. Execute a GET request to the following relative URI:",
       "v1.0/identityGovernance/accessReviews/definitions",
@@ -5477,8 +5407,7 @@
       "4. The control is compliant when all 6 privileged directory roles have an associated",
       "access review definition that meets all the criteria listed above.",
       "Note: The 6 roles referenced and their associated GUIDs can be found in the",
-      "Additional Information section.",
-      "Page 405"
+      "Additional Information section."
     ],
     "audit_ps": "",
     "remediation": [
@@ -5517,8 +5446,7 @@
       "v1.0/identityGovernance/accessReviews/definitions",
       "The request body must include properties that satisfy the audit criteria above. The",
       "Graph API documentation provides complete sample request bodies in multiple",
-      "languages including HTTP, PowerShell, and Python. See Reference 3 for details",
-      "Page 406"
+      "languages including HTTP, PowerShell, and Python. See Reference 3 for details"
     ],
     "sort_order": 99,
     "archived": false,
@@ -5529,7 +5457,7 @@
   },
   {
     "check_id": "5.3.4",
-    "title": "Ensure approval is required for Global Administrator role",
+    "title": "Ensure approval is required for Global Administrator role activation",
     "type": "Manual",
     "section": "Microsoft Entra Admin Center",
     "subsection": "ID Governance",
@@ -5567,8 +5495,7 @@
       "4. Verify that approvalStages.primaryApprovers contains one or more valid",
       "users.",
       "Note: Approvers should be reviewed on a regular basis to ensure the members are",
-      "active and valid.",
-      "Page 410"
+      "active and valid."
     ],
     "audit_ps": "",
     "remediation": [
@@ -5592,7 +5519,7 @@
   },
   {
     "check_id": "5.3.5",
-    "title": "Ensure approval is required for Privileged Role",
+    "title": "Ensure approval is required for Privileged Role Administrator activation",
     "type": "Manual",
     "section": "Microsoft Entra Admin Center",
     "subsection": "ID Governance",
@@ -5630,8 +5557,7 @@
       "4. Verify that approvalStages.primaryApprovers contains one or more valid",
       "users.",
       "Note: Approvers should be reviewed on a regular basis to ensure the members are",
-      "active and valid.",
-      "Page 413"
+      "active and valid."
     ],
     "audit_ps": "",
     "remediation": [
