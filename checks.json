@@ -276,7 +276,7 @@
     ],
     "sort_order": 6,
     "risk_level": "High",
-    "impact_level": "High",
+    "impact_level": "Low",
     "rationale_short": "Organizations such as NIST and Microsoft recommend against arbitrarily requiring users to change their passwords after a set period, unless there is evidence of compromise or the user has forgotten the password.",
     "impact_short": "When setting passwords not to expire it is important to have other controls in place to supplement this setting. See below for related recommendations and user guidance. • Ban common passwords. • Educate users to not reuse organization passwords anywhere else."
   },
@@ -356,7 +356,7 @@
     ],
     "sort_order": 8,
     "risk_level": "High",
-    "impact_level": "Medium",
+    "impact_level": "Low",
     "rationale_short": "Attackers often spend time learning about organizations before launching an attack. Publicly available calendars can help attackers understand organizational relationships and determine when specific users may be more vulnerable to an attack, such as when they are traveling.",
     "impact_short": "This functionality is not widely used. As a result, it is unlikely that implementation of this setting will cause an impact to most users."
   },
@@ -456,7 +456,7 @@
     ],
     "sort_order": 10,
     "risk_level": "Low",
-    "impact_level": "High",
+    "impact_level": "Medium",
     "rationale_short": "Enabling internal phishing protection for Microsoft Forms will prevent attackers using forms for phishing attacks by asking personal or other sensitive information and URLs.",
     "impact_short": "If potential phishing was detected, the form will be temporarily blocked and cannot be distributed, and response collection will not happen until it is unblocked by the administrator or keywords were removed by the creator."
   },
@@ -490,7 +490,7 @@
     ],
     "sort_order": 11,
     "risk_level": "High",
-    "impact_level": "High",
+    "impact_level": "Medium",
     "rationale_short": "Enabling this feature protects organizational data against data spillage and exfiltration.",
     "impact_short": "Administrators will need to grant Microsoft access to the tenant environment prior to a Microsoft engineer accessing the environment for support or troubleshooting."
   },
@@ -556,7 +556,7 @@
     ],
     "sort_order": 13,
     "risk_level": "Low",
-    "impact_level": "Medium",
+    "impact_level": "Low",
     "rationale_short": "Disable external sharing of Sway documents that can contain sensitive information to prevent accidental or arbitrary data leaks.",
     "impact_short": "Interactive reports, presentations, newsletters, and other items created in Sway will not be shared outside the organization by users."
   },
@@ -578,7 +578,7 @@
     "remediation": [],
     "sort_order": 14,
     "risk_level": "Low",
-    "impact_level": "High",
+    "impact_level": "Medium",
     "rationale_short": "Shared Bookings pages can be exploited by threat actors to impersonate legitimate users using convincing internal email addresses.",
     "impact_short": "Disabling Shared Bookings will limit users’ ability to create self-service scheduling pages, which may reduce convenience for teams that rely on automated meeting coordination."
   },
@@ -628,7 +628,7 @@
     ],
     "sort_order": 15,
     "risk_level": "Critical",
-    "impact_level": "High",
+    "impact_level": "Low",
     "rationale_short": "Safe Links for Office applications extends phishing protection to documents and emails that contain hyperlinks, even after they have been delivered to a user.",
     "impact_short": "User impact associated with this change is minor - users may experience a very short delay when clicking on URLs in Office documents before being directed to the requested site."
   },
@@ -716,7 +716,7 @@
     ],
     "sort_order": 17,
     "risk_level": "High",
-    "impact_level": "Medium",
+    "impact_level": "Low",
     "rationale_short": "This setting alerts administrators that an internal user sent a message that contained malware. This may indicate an account or machine compromise that would need to be investigated.",
     "impact_short": "Notification of account with potential issues should not have an impact on the user."
   },
@@ -848,7 +848,7 @@
     ],
     "sort_order": 20,
     "risk_level": "High",
-    "impact_level": "Medium",
+    "impact_level": "Low",
     "rationale_short": "A blocked account is a good indication that the account in question has been breached, and an attacker is using it to send spam emails to other people.",
     "impact_short": "Notification of users that have been blocked should not cause an impact to the user."
   },
@@ -932,7 +932,7 @@
     ],
     "sort_order": 22,
     "risk_level": "Critical",
-    "impact_level": "High",
+    "impact_level": "Low",
     "rationale_short": "SPF records enable Exchange Online Protection and other mail systems to verify which servers are authorized to send email for a domain. This helps those systems determine whether a message is legitimate or potentially spoofed.",
     "impact_short": "Setting up SPF records typically has minimal operational impact. However, organizations must ensure proper configuration, as misconfigured SPF records can cause legitimate email to be flagged as spam or fail authentication checks."
   },
@@ -1090,7 +1090,7 @@
     ],
     "sort_order": 26,
     "risk_level": "High",
-    "impact_level": "Medium",
+    "impact_level": "Low",
     "rationale_short": "Without additional verification like mail flow rules, email from sources in the IP Allow List skips spam filtering and sender authentication (SPF, DKIM, DMARC) checks.",
     "impact_short": "This is the default behavior. IP Allow lists may reduce false positives, however, this benefit is outweighed by the importance of a policy which scans all messages regardless of the origin. This supports the principle of zero trust."
   },
@@ -1126,7 +1126,7 @@
     ],
     "sort_order": 27,
     "risk_level": "High",
-    "impact_level": "Medium",
+    "impact_level": "Low",
     "rationale_short": "Without additional verification like mail flow rules, email from sources in the IP Allow List skips spam filtering and sender authentication (SPF, DKIM, DMARC) checks.",
     "impact_short": "This is the default behavior. IP Allow lists may reduce false positives, however, this benefit is outweighed by the importance of a policy which scans all messages regardless of the origin. This supports the principle of zero trust."
   },
@@ -1165,7 +1165,7 @@
     ],
     "sort_order": 28,
     "risk_level": "High",
-    "impact_level": "Medium",
+    "impact_level": "Low",
     "rationale_short": "Messages from entries in the allowed senders list or the allowed domains list bypass most email protection (except malware and high confidence phishing) and email authentication checks (SPF, DKIM and DMARC).",
     "impact_short": "This is the default behavior. Allowed domains may reduce false positives, however, this benefit is outweighed by the importance of having a policy which scans all messages regardless of the origin. As an alternative consider sender based lists."
   },
@@ -1243,7 +1243,7 @@
     ],
     "sort_order": 30,
     "risk_level": "High",
-    "impact_level": "Medium",
+    "impact_level": "Low",
     "rationale_short": "Emergency access accounts should be used in very few scenarios, for example, the last Global Administrator has left the organization and the account is inaccessible.",
     "impact_short": "There is no real world impact to monitoring these accounts beyond allocating staff. The frequency of emergency account sign on should be so low that any activity raises a red flag that is treated with the highest priority."
   },
@@ -2180,7 +2180,7 @@
     "sort_order": 52,
     "archived": false,
     "risk_level": "High",
-    "impact_level": "High",
+    "impact_level": "Medium",
     "rationale_short": "If a threat actor compromises a standard user account, they can enroll a rogue device under that user's identity. This device may inherit MDM policies and appear compliant, giving attackers persistent access to cloud resources without triggering MFA.",
     "impact_short": "Restricting the setting requires IT teams to assign enrollment permissions to specific staff, such as helpdesk or provisioning personnel, which may impact user-driven Autopilot scenarios and increase administrative overhead for device onboarding and support."
   },
@@ -2343,7 +2343,7 @@
     "sort_order": 56,
     "archived": false,
     "risk_level": "High",
-    "impact_level": "High",
+    "impact_level": "Medium",
     "rationale_short": "Managing local Administrator passwords across multiple systems can be challenging. As a result, many organizations opt to configure the same password on all workstations and/or member servers during deployment.",
     "impact_short": "Enabling LAPS requires some additional operational overhead."
   },
@@ -3094,7 +3094,7 @@
     "sort_order": 66,
     "archived": false,
     "risk_level": "High",
-    "impact_level": "High",
+    "impact_level": "Medium",
     "rationale_short": "Restricting who can invite guests limits the exposure the organization might face from unauthorized accounts. The default behavior allows anyone within the organization to invite guests and non-admins to the tenant, posing a security risk.",
     "impact_short": "This introduces an obstacle to collaboration by restricting who can invite guest users to the organization. Designated Guest Inviters must be assigned, and an approval process established and clearly communicated to all users."
   },
@@ -4070,7 +4070,7 @@
     "sort_order": 76,
     "archived": false,
     "risk_level": "High",
-    "impact_level": "High",
+    "impact_level": "Medium",
     "rationale_short": "Since August 2024, Microsoft has observed threat actors, such as Storm-2372, employing \"device code phishing\" attacks. These attacks deceive users into logging into productivity applications, capturing authentication tokens to gain further access to compromised accounts.",
     "impact_short": "Some administrative overhead will be required for stricter management of these devices. Since exclusions do not violate compliance, this feature can still be utilized effectively within a controlled environment."
   },
@@ -4146,7 +4146,7 @@
     "sort_order": 77,
     "archived": false,
     "risk_level": "High",
-    "impact_level": "High",
+    "impact_level": "Medium",
     "rationale_short": "A 7-day interval balances security and user experience by reducing the maximum lifespan of compromised credentials or stolen tokens without introducing excessive reauthentication prompts that can increase phishing susceptibility and user fatigue.",
     "impact_short": "Most users will not find weekly reauthentication requirements disruptive."
   },
@@ -4626,7 +4626,7 @@
     "sort_order": 84,
     "archived": false,
     "risk_level": "Medium",
-    "impact_level": "High",
+    "impact_level": "Medium",
     "rationale_short": "This feature protects an organization by prohibiting the use of weak or leaked passwords. In addition, organizations can create custom banned password lists to prevent their users from using easily guessed passwords that are specific to their industry.",
     "impact_short": "The potential impact associated with implementation of this setting is dependent upon the existing password policies in place in the environment. For environments that have strong password policies in place, the impact will be minimal."
   },
@@ -4678,7 +4678,7 @@
     "sort_order": 85,
     "archived": false,
     "risk_level": "Critical",
-    "impact_level": "High",
+    "impact_level": "Medium",
     "rationale_short": "Multifactor authentication requires an individual to present a minimum of two separate forms of authentication before access is granted.",
     "impact_short": "When using the UI audit method guest users will appear in the report and unless the organization is applying MFA rules to guests then they will need to be manually filtered. Accounts that provide on-premises directory synchronization also appear in these reports."
   },
@@ -4776,7 +4776,7 @@
     "sort_order": 87,
     "archived": false,
     "risk_level": "Medium",
-    "impact_level": "Medium",
+    "impact_level": "Low",
     "rationale_short": "Regardless of the authentication method enabled by an administrator or set as preferred by the user, the system will dynamically select the most secure option available at the time of authentication.",
     "impact_short": "The Microsoft managed value of system-preferred MFA is Enabled and as such enforces the default behavior. No additional impact is expected."
   },
@@ -4874,7 +4874,7 @@
     "sort_order": 89,
     "archived": false,
     "risk_level": "High",
-    "impact_level": "High",
+    "impact_level": "Medium",
     "rationale_short": "Account lockout is a method of protecting against brute-force and password spray attacks. Once the lockout threshold has been exceeded, the account enters a locked- out state which prevents all login attempts for a variable duration.",
     "impact_short": "If account lockout threshold is set too low (less than 3), users may experience frequent lockout events and the resulting security alerts may contribute to alert fatigue."
   },
@@ -4920,7 +4920,7 @@
     "sort_order": 90,
     "archived": false,
     "risk_level": "High",
-    "impact_level": "High",
+    "impact_level": "Medium",
     "rationale_short": "Account lockout is a method of protecting against brute-force and password spray attacks. Once the lockout threshold has been exceeded, the account enters a locked- out state which prevents all login attempts for a variable duration.",
     "impact_short": "If account lockout duration is set too low (less than 60 seconds), malicious actors can perform more password spray and brute-force attempts over a given period of time."
   },
@@ -4966,7 +4966,7 @@
     "sort_order": 91,
     "archived": false,
     "risk_level": "Medium",
-    "impact_level": "High",
+    "impact_level": "Medium",
     "rationale_short": "Authenticator Lite does not support application name or geographic location context in push notifications, regardless of tenant-wide Authenticator feature settings. These are key defenses against MFA fatigue attacks that are only available in the full Microsoft Authenticator app.",
     "impact_short": "Users who have registered Authenticator Lite as their only MFA method will be unable to complete MFA until they install and register the standalone Microsoft Authenticator app."
   },
@@ -4999,7 +4999,7 @@
     "sort_order": 92,
     "archived": false,
     "risk_level": "Low",
-    "impact_level": "High",
+    "impact_level": "Medium",
     "rationale_short": "Enabling Self-Service Password Reset (SSPR) significantly reduces helpdesk interactions, streamlining support operations and improving user experience.",
     "impact_short": "Users will be required to provide additional contact information in order to enroll in SSPR. Some light user education may be necessary, particularly for individuals who are accustomed to contacting the help desk for password reset assistance."
   },
@@ -5033,7 +5033,7 @@
     "sort_order": 93,
     "archived": false,
     "risk_level": "Low",
-    "impact_level": "High",
+    "impact_level": "Medium",
     "rationale_short": "Requiring Multi-factor Authentication (MFA) for Self-service Password Reset (SSPR) strengthens the password reset process by confirming the user's identity with two separate methods of authentication.",
     "impact_short": "If multiple methods are required for password reset and a user has lost access to other authentication methods, the resetting user will need an administrator with permissions to remove the lost authentication method."
   },
@@ -5142,7 +5142,7 @@
     "sort_order": 96,
     "archived": false,
     "risk_level": "Low",
-    "impact_level": "High",
+    "impact_level": "Medium",
     "rationale_short": "Administrator accounts are sensitive. Any password reset activity notification, when sent to all Administrators, ensures that all Global Administrators can passively confirm if such a reset is a common pattern within their group.",
     "impact_short": "All Global Administrators will receive a notification from Azure every time a password is reset. This is useful for auditing procedures to confirm that there are no out of the ordinary password resets for Administrators."
   },
@@ -5623,7 +5623,7 @@
     ],
     "sort_order": 103,
     "risk_level": "Medium",
-    "impact_level": "Medium",
+    "impact_level": "Low",
     "rationale_short": "Whether it is for regulatory compliance or for tracking unauthorized configuration changes in Microsoft 365, enabling mailbox auditing and ensuring the proper mailbox actions are accounted for allows for Microsoft 365 teams to run security operations, forensics or general investigations on mailbox activities.",
     "impact_short": "Adding additional audit action types and increasing the AuditLogAgeLimit from 90 to 180 days will have a limited impact on mailbox storage. Mailbox audit log records are stored in a subfolder (named Audits) in the Recoverable Items folder in each user's mailbox."
   },
@@ -5798,7 +5798,7 @@
     "remediation": [],
     "sort_order": 109,
     "risk_level": "High",
-    "impact_level": "High",
+    "impact_level": "Medium",
     "rationale_short": "Personal email accounts are not subject to corporate security controls such as anti- malware scanning, data loss prevention (DLP), Safe Links, or audit logging.",
     "impact_short": "This control does not apply to classic Outlook for Windows, Outlook for Mac, or Outlook mobile apps. Organizations requiring broader coverage should evaluate additional controls like application management policies to restrict personal account usage on those clients."
   },
@@ -5962,7 +5962,7 @@
     ],
     "sort_order": 115,
     "risk_level": "High",
-    "impact_level": "High",
+    "impact_level": "Medium",
     "rationale_short": "Strong authentication controls, such as the use of multifactor authentication, may be circumvented if basic authentication is used by SharePoint applications.",
     "impact_short": "Implementation of modern authentication for SharePoint will require users to authenticate to SharePoint using modern authentication. This may cause a minor impact to typical user behavior. This may also prevent third-party apps from accessing SharePoint Online resources."
   },
@@ -6396,7 +6396,7 @@
     ],
     "sort_order": 128,
     "risk_level": "Low",
-    "impact_level": "High",
+    "impact_level": "Medium",
     "rationale_short": "Channel email addresses are not under the tenant’s domain and organizations do not have control over the security settings for this email address. An attacker could email channels directly if they discover the channel email address.",
     "impact_short": "Depending on the organization's adoption, disabling this may disrupt workflows that rely on email-to-channel communication, particularly in environments where email is used to bridge external systems or vendors into Teams."
   },
@@ -7205,7 +7205,7 @@
     ],
     "sort_order": 149,
     "risk_level": "Low",
-    "impact_level": "High",
+    "impact_level": "Medium",
     "rationale_short": "Establishing data classifications and affixing labels to data at creation enables organizations to discern the data's criticality, sensitivity, and value.",
     "impact_short": "Additional license requirements like Power BI Pro are required, as outlined in the Licensed and requirements page linked in the description and references sections."
   },
