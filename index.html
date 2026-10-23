@@ -24138,6 +24138,7 @@ function startReview(customerId, customerName) {
   window._secureScoreControls = [];
   window._currentSecureScore = null;
   window._psResults = {};
+  window._graphErrSeen = {};
   document.getElementById('review-customer-name').textContent = customerName;
   document.getElementById('review-login-step').style.display = '';
   document.getElementById('review-progress-step').style.display = 'none';
@@ -24200,6 +24201,17 @@ async function doReviewLogin() {
         showToast('Mangler stadig: ' + missing.join(', ') + '. Review fortsætter, men nogle kontroller bliver ikke vurderet.', 'error');
       }
     }
+    try {
+      const sc = tokenScopes(resp.accessToken);
+      console.log('Review token scopes:', sc ? sc.join(' ') : '(kunne ikke læses)');
+      console.log('Review mangler:', missing.join(', ') || '(ingen)');
+      let claims = {}; try { claims = JSON.parse(atob(resp.accessToken.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))); } catch (e2) {}
+      const ROLE_NAMES = { '62e90394-69f5-4237-9190-012177145e10':'Global Administrator', 'f2ef992c-3afb-46b9-b7cf-a126ee74c451':'Global Reader', '5d6b6bb7-de71-4623-b4af-96380a352509':'Security Reader', '194ae4cb-b126-40b2-bd5b-6091b380977d':'Security Administrator', 'e8611ab8-c189-46e8-94e1-60213ab1f814':'Privileged Role Administrator', '729827e3-9c14-49f7-bb1b-9608f156bbb8':'Helpdesk Administrator', 'fe930be7-5e62-47db-91af-98c3a49a38b1':'User Administrator' };
+      const roles = (claims.wids || []).map(w => ROLE_NAMES[w] || w);
+      console.log('Review token: tid=' + claims.tid + ' appid=' + (claims.appid || claims.azp) + ' roller=' + (roles.join(', ') || '(ingen aktive roller)'));
+      logReview('TOKEN', missing.length ? 'review' : 'implemented', 'Rettigheder i tokenet: ' + (sc ? sc.join(' ') : 'kunne ikke læses') + (missing.length ? ' | MANGLER: ' + missing.join(', ') : ''));
+      logReview('ROLLER', roles.length ? 'implemented' : 'review', 'Kontoens aktive administratorroller: ' + (roles.join(', ') || 'ingen (kontoen har ikke en aktiv rolle)'));
+    } catch (e) {}
 
     reviewMsalInstance.setActiveAccount(resp.account);
     reviewToken = resp.accessToken;
@@ -24231,7 +24243,7 @@ async function callReviewGraph(endpoint, method = 'GET', body = null) {
     },
     body: body ? JSON.stringify(body) : undefined
   });
-  if (!r.ok) return null;
+  if (!r.ok) { await reportGraphError(r, endpoint); return null; }
   if (r.status === 204) return {};
   return r.json().catch(() => null);
 }
@@ -24240,8 +24252,28 @@ async function callReviewGraphBeta(endpoint) {
   const r = await fetch(`https://graph.microsoft.com/beta${endpoint}`, {
     headers: { 'Authorization': `Bearer ${reviewToken}` }
   });
-  if (!r.ok) return null;
+  if (!r.ok) { await reportGraphError(r, '(beta) ' + endpoint); return null; }
   return r.json().catch(() => null);
+}
+
+// Viser Graphs egen fejlbesked, så vi kan se HVORFOR et kald afvises (manglende scope, licens, rolle osv.)
+window._graphErrSeen = {};
+async function reportGraphError(r, endpoint) {
+  try {
+    let code = '', msg = '';
+    try { const j = await r.clone().json(); code = (j.error && j.error.code) || ''; msg = (j.error && j.error.message) || ''; } catch (e) {}
+    const www = r.headers.get('WWW-Authenticate') || '';
+    const key = r.status + '|' + code + '|' + msg;
+    const path = endpoint.split('?')[0];
+    console.warn('Graph ' + r.status + ' ' + path + ' → ' + code + ': ' + msg + (www ? ' | ' + www : ''));
+    if (r.status === 404 || r.status === 401) return;
+    const seen = window._graphErrSeen;
+    if (!seen[key]) { seen[key] = []; }
+    seen[key].push(path);
+    if (seen[key].length === 1 && Object.keys(seen).length <= 10) {
+      logReview('FEJL ' + r.status, 'review', path + ' → ' + (code || 'ingen kode') + ': ' + (msg || 'ingen besked').slice(0, 220));
+    }
+  } catch (e) {}
 }
 
 function logReview(checkId, status, detail) {
