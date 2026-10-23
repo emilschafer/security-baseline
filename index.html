@@ -767,6 +767,70 @@ tbody tr:hover td { background: var(--bg); }
   .comment-field:focus { border-color: var(--accent); }
 
 .modal-overlay { isolation: isolate; }
+
+/* ══ NYT DESIGN (sidebar, dashboard, kunder) ══════════════ */
+:root { --accent:#0e7c86; --accent-light:#e3f4f5; --accent-border:#9ed3d7; }
+.btn-primary:hover { background:#0b6a73; border-color:#0b6a73; }
+.topbar { position:fixed; left:0; top:0; bottom:0; width:232px; height:auto; flex-direction:column; align-items:stretch; justify-content:flex-start; padding:20px 14px; gap:6px; background:#0f1b2d; border-bottom:none; box-shadow:none; z-index:200; }
+.topbar-logo { color:#fff; padding:4px 8px 18px; }
+.topbar-nav { flex-direction:column; align-items:stretch; flex:0 0 auto; gap:4px; }
+.topbar-nav-item { color:#c5cee0; padding:11px 14px; min-height:44px; font-size:14px; gap:12px; text-align:left; }
+.topbar-nav-item:hover { background:#1b2a42; color:#fff; }
+.topbar-nav-item.active { background:#0e7c86; color:#fff; }
+.topbar-nav-item svg { width:18px; height:18px; }
+.topbar-right { margin-top:auto; flex-direction:column; align-items:stretch; margin-left:0; border-top:1px solid #22324d; padding-top:14px; }
+.user-chip { background:#1b2a42; border-color:#22324d; color:#fff; }
+.topbar-right .btn-ghost { color:#c5cee0; justify-content:center; }
+.topbar-right .btn-ghost:hover { background:#1b2a42; color:#fff; border-color:transparent; }
+.main { max-width:1280px; margin:0 0 0 232px; padding:2rem 2rem 3rem; }
+@media (max-width: 900px) {
+  .topbar { position:static; width:auto; flex-direction:row; flex-wrap:wrap; align-items:center; padding:10px 12px; }
+  .topbar-logo { padding:0 8px 0 0; }
+  .topbar-nav { flex-direction:row; flex-wrap:wrap; }
+  .topbar-right { margin-top:0; border:none; padding:0; flex-direction:row; margin-left:auto; }
+  .main { margin:0 auto; padding:1.25rem 1rem; }
+}
+.nd-kpis { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:14px; margin-bottom:1.25rem; }
+.nd-kpi, .nd-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-lg); box-shadow:var(--shadow); }
+.nd-kpi { padding:1.1rem 1.25rem; }
+.nd-card { padding:1.25rem; }
+.nd-card h2 { font-size:15px; font-weight:600; margin-bottom:12px; }
+.nd-kpi-l { font-size:12px; font-weight:600; color:var(--text2); }
+.nd-kpi-v { font-size:28px; font-weight:700; letter-spacing:-.5px; margin-top:4px; }
+.nd-kpi-s { font-size:12px; color:var(--text2); margin-top:2px; }
+.nd-chip { display:inline-flex; align-items:center; padding:2px 10px; border-radius:99px; font-size:12px; font-weight:600; white-space:nowrap; }
+.nd-ent { background:#e0e7ff; color:#2f3d9a; } .nd-smb { background:#d5f0f2; color:#0a5c64; }
+.nd-g { background:#dcf3e6; color:#17633f; } .nd-o { background:#ffe8cc; color:#8a3a06; } .nd-r { background:#fde0dd; color:#9e1c12; } .nd-b { background:#dbe8fd; color:#124aa6; } .nd-n { background:#e8eaef; color:#47505f; }
+.nd-dot { display:inline-block; width:10px; height:10px; border-radius:50%; flex:none; }
+.nd-dot-g { background:#1f8a57; } .nd-dot-o { background:#e07a10; } .nd-dot-r { background:#c8281b; } .nd-dot-b { background:#2a6fe0; } .nd-dot-n { background:#98a1b0; }
+.nd-bar { display:flex; height:10px; border-radius:99px; overflow:hidden; background:#e8eaef; }
+.nd-sg { background:#1f8a57; } .nd-so { background:#e07a10; } .nd-sr { background:#c8281b; } .nd-sb { background:#2a6fe0; } .nd-sn { background:#b9c0cc; }
+.nd-row { display:flex; flex-wrap:wrap; gap:16px; margin-bottom:1.25rem; }
+.nd-row > .nd-card { flex:1 1 380px; min-width:0; }
+.nd-selrow { display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin-bottom:1.25rem; }
+.nd-selrow label { font-size:12px; font-weight:600; color:var(--text2); }
+.nd-selrow select, .nd-search { padding:9px 12px; border:1px solid var(--border); border-radius:var(--radius); font-size:13px; background:var(--surface); font-family:inherit; min-width:240px; }
+.nd-legend { display:flex; flex-wrap:wrap; gap:8px 20px; margin-top:14px; font-size:13px; }
+.nd-legend span { display:inline-flex; align-items:center; gap:8px; }
+.nd-areas { display:grid; grid-template-columns:repeat(auto-fill,minmax(250px,1fr)); gap:12px; }
+.nd-area { border:1px solid var(--border); border-radius:10px; padding:14px; display:flex; flex-direction:column; gap:8px; }
+.nd-area strong { font-size:14px; }
+.nd-muted { color:var(--text2); font-size:12px; }
+.nd-tabs { display:flex; flex-wrap:wrap; border-bottom:1px solid var(--border); margin-bottom:1.25rem; }
+.nd-tab { border:0; background:none; padding:0 16px; min-height:44px; font:inherit; font-size:14px; font-weight:600; color:var(--text2); border-bottom:3px solid transparent; cursor:pointer; }
+.nd-tab:hover { color:var(--text); }
+.nd-tab.on { color:#0a5c64; border-bottom-color:var(--accent); }
+.nd-link { border:0; background:none; padding:0; font:inherit; font-weight:600; color:#0a5c64; cursor:pointer; text-align:left; }
+.nd-link:hover { text-decoration:underline; }
+.nd-cov { display:flex; align-items:center; gap:10px; min-width:140px; }
+.nd-cov .nd-bar { flex:1; }
+.nd-head { display:flex; flex-wrap:wrap; gap:20px; align-items:center; justify-content:space-between; margin-bottom:1.25rem; }
+.nd-logo { width:60px; height:60px; border-radius:12px; background:#e8eaef; color:#33405a; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:19px; flex:none; }
+.nd-cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:16px; }
+.nd-profile { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:16px 24px; }
+.nd-profile .nd-muted { margin-bottom:2px; }
+#tracker-level { font-size:12px; font-weight:600; }
+.customer-bar select { padding:8px 12px; border:1px solid var(--border); border-radius:var(--radius); background:var(--surface); font-family:inherit; font-size:13px; color:var(--text); }
 </style>
 </head>
 <body>
@@ -847,6 +911,10 @@ tbody tr:hover td { background: var(--bg); }
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
         <span>Baseline punkter</span>
       </button>
+      <button class="topbar-nav-item" onclick="showPage('reports', this)" id="nav-reports">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 3h8l4 4v14H7z"/><path d="M15 3v4h4"/><path d="M10 12h6M10 16h6"/></svg>
+        <span>Rapporter</span>
+      </button>
     </nav>
     <div class="topbar-right">
       <div class="user-chip">
@@ -865,19 +933,12 @@ tbody tr:hover td { background: var(--bg); }
     <div class="page active" id="page-dashboard">
       <div class="page-header">
         <h1>Dashboard</h1>
-        <p>Overblik på tværs af alle kunder</p>
+        <p>Overblik over alle kunder og niveauer</p>
       </div>
-      <div class="stats-grid" id="dash-stats">
-        <div class="stat-card stat-accent"><div class="stat-val" id="stat-customers">–</div><div class="stat-label">Kunder</div></div>
-        <div class="stat-card"><div class="stat-val" id="stat-checks">–</div><div class="stat-label">Baseline punkter</div></div>
-        <div class="stat-card stat-green"><div class="stat-val" id="stat-implemented">–</div><div class="stat-label">Implemented</div></div>
-        <div class="stat-card stat-amber"><div class="stat-val" id="stat-review">–</div><div class="stat-label">Under review</div></div>
-        <div class="stat-card stat-blue"><div class="stat-val" id="stat-accepted">–</div><div class="stat-label">Accepted</div></div>
-        <div class="stat-card stat-red"><div class="stat-val" id="stat-declined">–</div><div class="stat-label">Declined</div></div>
-      </div>
-      <div class="table-wrap" id="dash-table">
-        <div class="loading-state"><div class="spinner"></div> Henter data…</div>
-      </div>
+      <div class="nd-kpis" id="dash-kpis"></div>
+      <div class="nd-selrow"><label for="dash-cust">Vis for</label><select id="dash-cust" onchange="renderDashboard()"></select></div>
+      <div class="nd-row" id="dash-cards"></div>
+      <div class="nd-card" id="dash-status"></div>
     </div>
 
     <!-- TRACKER -->
@@ -890,7 +951,8 @@ tbody tr:hover td { background: var(--bg); }
           <label>Kunde</label>
           <select id="tracker-customer" onchange="onCustomerChange()" style="flex:1;max-width:280px;"></select>
         </div>
-        <div class="progress-wrap">
+        <span id="tracker-level"></span>
+      <div class="progress-wrap">
           <div class="progress-meta">
             <span>Fremgang</span>
             <strong id="prog-label">0 / 0</strong>
@@ -921,12 +983,26 @@ tbody tr:hover td { background: var(--bg); }
     <!-- CUSTOMERS -->
     <div class="page" id="page-customers">
       <div class="page-header-row page-header">
-        <div><h1>Kunder</h1><p>Administrer kunder</p></div>
+        <div><h1>Kunder</h1><p>Alle kunder, niveau og dækning</p></div>
         <button class="btn btn-primary" onclick="openCustomerModal()">+ Ny kunde</button>
+      </div>
+      <div class="nd-selrow">
+        <div class="filter-bar" style="margin:0;">
+          <button class="filter-btn active" onclick="setCustLvl('alle',this)">Alle</button>
+          <button class="filter-btn" onclick="setCustLvl('ENT',this)">Premium Enterprise</button>
+          <button class="filter-btn" onclick="setCustLvl('SMB',this)">Premium SMB</button>
+        </div>
+        <input class="nd-search" id="cust-search" type="search" placeholder="Søg efter kunde" aria-label="Søg efter kunde" oninput="renderCustomersTable()">
       </div>
       <div class="table-wrap" id="customers-table">
         <div class="loading-state"><div class="spinner"></div> Henter…</div>
       </div>
+    </div>
+
+    <!-- CUSTOMER DETAIL -->
+    <div class="page" id="page-customer">
+      <button class="nd-link" onclick="showPage('customers')" style="margin-bottom:12px;">← Alle kunder</button>
+      <div id="cust-detail"></div>
     </div>
 
     <!-- CHECKS -->
@@ -938,6 +1014,15 @@ tbody tr:hover td { background: var(--bg); }
       <div class="table-wrap" id="checks-table">
         <div class="loading-state"><div class="spinner"></div> Henter…</div>
       </div>
+    </div>
+    <!-- REPORTS -->
+    <div class="page" id="page-reports">
+      <div class="page-header">
+        <h1>Rapporter</h1>
+        <p>Vælg kunde. Sprog (dansk/engelsk) og format (Word/PDF) vælges, når rapporten hentes.</p>
+      </div>
+      <div class="nd-selrow"><label for="rep-cust">Kunde</label><select id="rep-cust" onchange="renderReportsPage()"></select></div>
+      <div id="rep-cards"></div>
     </div>
   </main>
 </div>
@@ -25468,13 +25553,14 @@ function showApp() {
 
 // ── STATE ─────────────────────────────────────────
 let checks = [], customers = [], assessments = {};
+let allAssessments = {}, assessmentsOwner = null, custLvlFilter = 'alle', detailCustId = null, detailTab = 'over', lvlTouched = false;
 let selectedCustomer = null, currentFilter = 'all', openCard = null;
 let currentProfiles = [], currentAuditSteps = [];
 let saveTimers = {};
 
 // ── LOAD ──────────────────────────────────────────
 async function loadAll() {
-  await Promise.all([loadChecks(), loadCustomers()]);
+  await Promise.all([loadChecks(), loadCustomers(), loadAllAssessments()]);
   renderDashboard();
   renderCustomerSelect();
   renderCustomersTable();
@@ -25518,6 +25604,8 @@ async function loadChecksFromFile() {
     description: c.description || '',
     rationale: c.rationale || '',
     impact: c.impact || '',
+    rationale_short: c.rationale_short || '',
+    impact_short: c.impact_short || '',
     risk_level: c.risk_level || 'Medium',
     impact_level: c.impact_level || 'Medium',
     audit_ui: c.audit_ui || [],
@@ -25574,7 +25662,13 @@ function normalizeCheck(i) {
 }
 
 function normalizeCustomer(i) {
-  return { spId: i.spId, name: i.CustomerName || '', org_nr: i.OrgNr || '', contact: i.Contact || '' };
+  // Niveau, brugerantal og account manager gemmes som lille JSON i slutningen af det eksisterende Contact-felt: "tekst [[ADD:{...}]]"
+  const raw = i.Contact || '';
+  let text = raw, meta = {};
+  const m = raw.match(/\s*\[\[ADD:(\{[\s\S]*?\})\]\]\s*$/);
+  if (m) { try { meta = JSON.parse(m[1]) || {}; } catch(e) { meta = {}; } text = raw.slice(0, m.index); }
+  return { spId: i.spId, name: i.CustomerName || '', org_nr: i.OrgNr || '', contact: text,
+           lvl: meta.lvl === 'SMB' ? 'SMB' : 'ENT', lvlSet: !!meta.lvl, users: meta.users != null ? meta.users : null, am: meta.am || '' };
 }
 
 function tryParse(val, def) { try { return typeof val === 'string' ? JSON.parse(val) : (val || def); } catch(e) { return def; } }
@@ -25584,7 +25678,14 @@ function showPage(name, btn) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.topbar-nav-item').forEach(b => b.classList.remove('active'));
   document.getElementById('page-'+name).classList.add('active');
+  if (!btn && name === 'customer') btn = document.getElementById('nav-customers');
   if (btn) btn.classList.add('active');
+  syncSelectedAssessments();
+  if (name === 'dashboard') renderDashboard();
+  else if (name === 'customers') renderCustomersTable();
+  else if (name === 'customer') renderCustomerDetail();
+  else if (name === 'reports') renderReportsPage();
+  window.scrollTo(0, 0);
 }
 
 // ── DASHBOARD ─────────────────────────────────────
@@ -25624,7 +25725,7 @@ async function downloadLatestReport(customerId, customerName) {
     assessments = custAssessments;
 
     // Generer PDF med gemte noter
-    await generatePDFWithMeta(metaScore, metaNotes, metaNext);
+    await withReportScope(() => generatePDFWithMeta(metaScore, metaNotes, metaNext));
 
     // Gendan state
     selectedCustomer = prevCustomer;
@@ -25632,41 +25733,220 @@ async function downloadLatestReport(customerId, customerName) {
   } catch(e) { showToast('Fejl: ' + e.message, 'error'); }
 }
 
-function renderDashboard() {
-  document.getElementById('stat-customers').textContent = customers.length;
-  document.getElementById('stat-checks').textContent = checks.length;
-  let impl=0, rev=0, acc=0, dec=0;
-  customers.forEach(c => {
-    if (demoData.assessments[c.spId]) {
-      Object.values(demoData.assessments[c.spId]).forEach(a => {
-        if (a.status==='implemented') impl++;
-        else if (a.status==='review') rev++;
-        else if (a.status==='accepted') acc++;
-        else if (a.status==='declined') dec++;
-      });
-    }
-  });
-  document.getElementById('stat-implemented').textContent = impl;
-  document.getElementById('stat-review').textContent = rev;
-  document.getElementById('stat-accepted').textContent = acc;
-  document.getElementById('stat-declined').textContent = dec;
+// ── NYT DESIGN: niveau, områder og dækning ─────────────────
+const ND_AREAS = ['Brugere og licenser','Deling og samarbejde','Mailsikkerhed','Adgangskontrol','Enheder og app-beskyttelse','Apps med adgang til data','Defender, overvågning og databeskyttelse'];
+const SMB_CHECK_IDS = new Set(["1.1.1", "1.1.2", "1.1.3", "1.1.4", "1.2.2", "1.3.1", "1.3.2", "1.3.3", "1.3.4", "1.3.5", "2.1.1", "2.1.2", "2.1.3", "2.1.4", "2.1.5", "2.1.6", "2.1.7", "2.1.8", "2.1.9", "2.1.10", "2.1.12", "2.1.13", "2.1.14", "2.1.15", "2.4.5", "3.1.1", "3.3.1", "4.1", "4.2", "5.1.2.1", "5.1.2.2", "5.1.2.3", "5.1.2.4", "5.1.3.1", "5.1.3.3", "5.1.3.4", "5.1.4.2", "5.1.4.3", "5.1.4.4", "5.1.4.5", "5.1.5.1", "5.1.5.2", "5.1.5.4", "5.1.5.5", "5.1.5.6", "5.1.6.2", "5.2.2.1", "5.2.2.2", "5.2.2.4", "5.2.2.5", "5.2.2.9", "5.2.2.10", "5.2.2.11", "5.2.2.12", "5.2.2.13", "5.2.2.14", "5.2.2.15", "5.2.2.16", "5.2.2.17", "5.2.3.1", "5.2.3.2", "5.2.3.4", "5.2.3.5", "5.2.3.6", "5.2.3.8", "5.2.3.9", "5.2.3.10", "5.2.4.1", "5.2.4.3", "5.2.4.4", "5.2.4.5", "6.1.1", "6.1.2", "6.1.3", "6.2.1", "6.2.2", "6.2.3", "6.3.1", "6.3.2", "6.5.1", "6.5.2", "6.5.4", "6.5.5", "7.2.1", "7.2.2", "7.2.3", "7.2.4", "7.2.6", "7.2.7", "7.2.9", "7.2.10", "7.2.11", "7.3.1", "8.1.2", "8.2.1", "8.2.2", "8.2.3", "8.2.4", "8.4.1", "8.5.2", "8.5.3", "8.5.4", "8.5.7", "8.6.1"]);
+const ND_LVL = { ENT:{label:'Premium Enterprise', cls:'nd-ent'}, SMB:{label:'Premium SMB', cls:'nd-smb'} };
+const ND_COL = { g:['nd-g','nd-dot-g','I orden'], o:['nd-o','nd-dot-o','Bør ses på'], r:['nd-r','nd-dot-r','Kritisk'], b:['nd-b','nd-dot-b','Accepteret'], n:['nd-n','nd-dot-n','Ikke vurderet'] };
 
-  const rows = customers.map(c => `
-    <tr>
-      <td class="td-name">${c.name}</td>
-      <td>${c.org_nr || '–'}</td>
-      <td>${c.contact || '–'}</td>
-      <td class="td-actions">
-        <button class="btn btn-sm" onclick="goToCustomer('${c.spId}')">Åbn →</button>
-        <button class="btn btn-sm" style="background:var(--accent);color:#fff;" onclick="startReview('${c.spId}','${c.name}')">▶ Start review</button>
-        <button class="btn btn-sm btn-success" onclick="downloadLatestReport('${c.spId}','${c.name}')">📄 Rapport</button>
-      </td>
-    </tr>`).join('');
-  document.getElementById('dash-table').innerHTML = `
-    <table>
-      <thead><tr><th>Kunde</th><th>CVR</th><th>Kontakt</th><th></th></tr></thead>
-      <tbody>${rows || '<tr><td colspan="4" class="empty-state">Ingen kunder endnu — opret en under Kunder</td></tr>'}</tbody>
-    </table>`;
+function escH(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch])); }
+function ndPct(a, b) { return b > 0 ? Math.round(a * 100 / b) + '%' : '–'; }
+
+function areaOfCheck(c) {
+  const id = String(c.check_id || ''), sec = c.section || '';
+  if (sec === 'Microsoft Fabric') return 6;
+  if (id.startsWith('5.1.5')) return 5;
+  if (id.startsWith('5.2') || id.startsWith('5.1.2') || id.startsWith('5.3')) return 3;
+  if (id.startsWith('5.1.4') || id.startsWith('4.')) return 4;
+  if (id.startsWith('5.1.3') || id.startsWith('5.1.6') || id.startsWith('7.') || id.startsWith('8.')) return 1;
+  if (id.startsWith('6.') || id.startsWith('2.1.')) return 2;
+  if (id.startsWith('2.') || id.startsWith('3.')) return 6;
+  if (id.startsWith('1.') || id.startsWith('5.1.')) return 0;
+  return 6;
+}
+function customerLevel(c) { return c && c.lvl === 'SMB' ? 'SMB' : 'ENT'; }
+function scopedChecks(c) { return customerLevel(c) === 'SMB' ? checks.filter(x => SMB_CHECK_IDS.has(x.check_id)) : checks; }
+
+function syncSelectedAssessments() {
+  if (selectedCustomer && assessmentsOwner === selectedCustomer.spId && assessments) {
+    const o = {};
+    Object.keys(assessments).forEach(k => { if (assessments[k] && assessments[k].status) o[k] = assessments[k]; });
+    allAssessments[selectedCustomer.spId] = o;
+  }
+}
+
+async function loadAllAssessments() {
+  allAssessments = {};
+  try {
+    if (APP_CONFIG.demoMode) {
+      Object.keys(demoData.assessments).forEach(id => { allAssessments[id] = Object.assign({}, demoData.assessments[id]); });
+      return;
+    }
+    const items = await getListItems(listIds.assessments);
+    items.forEach(i => {
+      if (!i.CustomerId || !i.CheckSpId || i.CheckSpId === 'LATEST_REPORT' || i.CheckSpId === 'SECURE_SCORE') return;
+      if (!allAssessments[i.CustomerId]) allAssessments[i.CustomerId] = {};
+      allAssessments[i.CustomerId][i.CheckSpId] = { status: i.Status || 'none', comment: i.Comment || '' };
+    });
+  } catch (e) { console.warn('Kunne ikke hente alle vurderinger:', e); }
+}
+
+function calcCustomer(cust) {
+  const ass = allAssessments[cust.spId] || {};
+  const areas = ND_AREAS.map((n, i) => ({ i, t: 0, impl: 0, crit: 0, warn: 0, acc: 0, na: 0 }));
+  scopedChecks(cust).forEach(c => {
+    const a = areas[areaOfCheck(c)];
+    const s = (ass[c.check_id] || ass[c.spId] || {}).status || 'none';
+    a.t++;
+    if (s === 'implemented') a.impl++;
+    else if (s === 'accepted') a.acc++;
+    else if (s === 'none') a.na++;
+    else if (c.risk_level === 'Critical') a.crit++;
+    else a.warn++;
+  });
+  const m = { areas, impl: 0, crit: 0, warn: 0, acc: 0, na: 0, total: 0 };
+  areas.forEach(a => {
+    a.col = (a.t - a.na === 0) ? 'n' : a.crit ? 'r' : a.warn ? 'o' : 'g';
+    ['impl','crit','warn','acc','na'].forEach(k => m[k] += a[k]);
+    m.total += a.t;
+  });
+  m.started = m.na < m.total;
+  m.col = !m.started ? 'n' : m.crit ? 'r' : m.warn ? 'o' : 'g';
+  return m;
+}
+
+function ndSegs(m) {
+  const d = [['nd-sg','nd-dot-g','I orden',m.impl],['nd-sr','nd-dot-r','Kritisk',m.crit],['nd-so','nd-dot-o','Bør ses på',m.warn],['nd-sb','nd-dot-b','Accepteret',m.acc],['nd-sn','nd-dot-n','Ikke vurderet',m.na]];
+  const bar = '<div class="nd-bar" style="height:14px;">' + d.map(x => `<div class="${x[0]}" style="width:${m.total ? x[3]*100/m.total : 0}%"></div>`).join('') + '</div>';
+  const leg = '<div class="nd-legend">' + d.map(x => `<span><span class="nd-dot ${x[1]}"></span>${x[2]} <strong>${x[3]}</strong></span>`).join('') + '</div>';
+  return bar + leg;
+}
+
+function renderDashboard() {
+  const sel = document.getElementById('dash-cust');
+  if (!sel) return;
+  const prev = sel.value || 'alle';
+  sel.innerHTML = '<option value="alle">Alle kunder</option>' + customers.map(c => `<option value="${escH(c.spId)}">${escH(c.name)}</option>`).join('');
+  sel.value = customers.some(c => c.spId === prev) ? prev : 'alle';
+
+  const M = {}; customers.forEach(c => { M[c.spId] = calcCustomer(c); });
+  const started = customers.filter(c => M[c.spId].started);
+  const ent = customers.filter(c => customerLevel(c) === 'ENT').length, smb = customers.length - ent;
+  const covAvg = started.length ? Math.round(started.reduce((x, c) => x + M[c.spId].impl / M[c.spId].total, 0) * 100 / started.length) : null;
+  const critAll = started.reduce((x, c) => x + M[c.spId].crit, 0);
+  document.getElementById('dash-kpis').innerHTML = `
+    <div class="nd-kpi"><div class="nd-kpi-l">Kunder i alt</div><div class="nd-kpi-v">${customers.length}</div><div class="nd-kpi-s">${customers.length - started.length} endnu ikke gennemgået</div></div>
+    <div class="nd-kpi"><div class="nd-kpi-l">Premium Enterprise</div><div class="nd-kpi-v">${ent}</div><div class="nd-kpi-s">80+ brugere · ${checks.length} kontroller</div></div>
+    <div class="nd-kpi"><div class="nd-kpi-l">Premium SMB</div><div class="nd-kpi-v">${smb}</div><div class="nd-kpi-s">under 80 brugere · ${SMB_CHECK_IDS.size} kontroller</div></div>
+    <div class="nd-kpi"><div class="nd-kpi-l">Gns. dækning</div><div class="nd-kpi-v">${covAvg == null ? '–' : covAvg + '%'}</div><div class="nd-kpi-s">kontroller i orden</div></div>
+    <div class="nd-kpi"><div class="nd-kpi-l">Kritiske fund</div><div class="nd-kpi-v" style="color:#9e1c12">${critAll}</div><div class="nd-kpi-s">på tværs af kunder</div></div>`;
+
+  const one = sel.value === 'alle' ? null : customers.find(c => c.spId === sel.value);
+  const scope = one ? [one] : started;
+  const areaRows = ND_AREAS.map((nm, i) => {
+    let ok = 0, t = 0;
+    scope.forEach(c => { const a = M[c.spId].areas[i]; ok += a.impl; t += a.t - a.na; });
+    return `<div><div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px;"><span>${nm}</span><strong>${ndPct(ok, t)}</strong></div><div class="nd-bar"><div class="nd-sg" style="width:${t ? ok*100/t : 0}%"></div></div></div>`;
+  }).join('');
+  let right;
+  if (one) {
+    const rows = M[one.spId].areas.map(a => `<tr><td><strong>${ND_AREAS[a.i]}</strong></td><td><span class="nd-chip ${ND_COL[a.col][0]}">${ND_COL[a.col][2]}</span></td><td><span class="nd-chip nd-r">${a.crit}</span></td><td><span class="nd-chip nd-o">${a.warn}</span></td></tr>`).join('');
+    right = `<h2>Status pr. område</h2><div style="overflow-x:auto;"><table><thead><tr><th>Område</th><th>Status</th><th>Kritisk</th><th>Bør ses på</th></tr></thead><tbody>${rows}</tbody></table></div>
+      <div style="margin-top:12px;"><button class="btn btn-sm" onclick="openCustomer('${escH(one.spId)}')">Åbn kunde →</button></div>`;
+  } else {
+    const rows = started.slice().sort((a, b) => M[b.spId].crit - M[a.spId].crit).slice(0, 5).map(c => `<tr><td><button class="nd-link" onclick="openCustomer('${escH(c.spId)}')">${escH(c.name)}</button></td><td><span class="nd-chip ${ND_LVL[customerLevel(c)].cls}">${ND_LVL[customerLevel(c)].label}</span></td><td><span class="nd-chip nd-r">${M[c.spId].crit}</span></td><td><span class="nd-chip nd-o">${M[c.spId].warn}</span></td></tr>`).join('');
+    right = `<h2>Kræver opmærksomhed</h2><div style="overflow-x:auto;"><table><thead><tr><th>Kunde</th><th>Niveau</th><th>Kritisk</th><th>Bør ses på</th></tr></thead><tbody>${rows || '<tr><td colspan="4" class="empty-state">Ingen gennemgåede kunder endnu</td></tr>'}</tbody></table></div>`;
+  }
+  document.getElementById('dash-cards').innerHTML = `<div class="nd-card"><h2>Dækning pr. område</h2><div style="display:flex;flex-direction:column;gap:14px;">${areaRows}</div></div><div class="nd-card">${right}</div>`;
+  const tot = { impl: 0, crit: 0, warn: 0, acc: 0, na: 0, total: 0 };
+  const sm = one ? M[one.spId] : started.reduce((o, c) => { ['impl','crit','warn','acc','na','total'].forEach(k => o[k] += M[c.spId][k]); return o; }, tot);
+  document.getElementById('dash-status').innerHTML = '<h2>Status for ' + (one ? 'kundens kontroller' : 'alle kontroller') + '</h2>' + ndSegs(sm);
+}
+
+function setCustLvl(v, btn) {
+  custLvlFilter = v;
+  btn.parentElement.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderCustomersTable();
+}
+
+function openCustomer(spId) {
+  detailCustId = spId; detailTab = 'over';
+  showPage('customer');
+}
+
+function setDetailTab(t) { detailTab = t; renderCustomerDetail(); }
+
+function reportCardsHtml(c) {
+  const lvl = customerLevel(c), id = escH(c.spId);
+  const actions = `<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:6px;"><button class="btn btn-primary btn-sm" onclick="openExportFor('${id}')">Eksportér (Word/PDF · dansk/engelsk)</button><button class="btn btn-sm btn-success" onclick="latestReportFor('${id}')">Seneste gemte rapport</button></div>`;
+  const soon = '<div class="nd-muted" style="margin-top:6px;">Under udvikling – ikke tilgængelig endnu</div>';
+  const card = (name, who, cls, desc, body) => `<div class="nd-card" style="display:flex;flex-direction:column;gap:10px;"><strong style="font-size:15px;">${name}</strong><span class="nd-chip ${cls}" style="align-self:flex-start;">${who}</span><div class="nd-muted" style="line-height:1.5;">${desc}</div>${body}</div>`;
+  let h = card('Sikkerhedstjek (review-rapport)', 'Alle kunder', 'nd-n', 'Let læselig oversigt med trafiklys pr. område og de vigtigste ting at tage fat på først.', soon);
+  if (lvl === 'SMB') {
+    h += card('Implementeringsrapport – Premium SMB', 'Premium SMB', 'nd-smb', 'Kort og ikke teknisk: det vi har sat op, hvad brugerne kan opleve, og hvad vi har aftalt.', soon);
+    h += card('Detaljeret rapport (teknisk)', 'Premium SMB', 'nd-smb', 'Den nuværende detaljerede rapport, begrænset til de ' + SMB_CHECK_IDS.size + ' kontroller i Premium SMB.', actions);
+  } else {
+    h += card('Implementeringsrapport – Premium Enterprise', 'Premium Enterprise', 'nd-ent', 'Den detaljerede rapport med status, risiko og noter for alle kontroller.', actions);
+  }
+  return '<div class="nd-cards">' + h + '</div>';
+}
+
+async function openExportFor(spId) {
+  const sel = document.getElementById('tracker-customer');
+  sel.value = spId;
+  await onCustomerChange();
+  openPDFModal();
+}
+function latestReportFor(spId) {
+  const c = customers.find(x => x.spId === spId);
+  if (c) downloadLatestReport(c.spId, c.name);
+}
+function reviewFor(spId) {
+  const c = customers.find(x => x.spId === spId);
+  if (c) startReview(c.spId, c.name);
+}
+
+function renderReportsPage() {
+  const sel = document.getElementById('rep-cust');
+  if (!sel) return;
+  const prev = sel.value;
+  sel.innerHTML = customers.map(c => `<option value="${escH(c.spId)}">${escH(c.name)} – ${ND_LVL[customerLevel(c)].label}</option>`).join('');
+  if (customers.some(c => c.spId === prev)) sel.value = prev;
+  const c = customers.find(x => x.spId === sel.value);
+  document.getElementById('rep-cards').innerHTML = c ? reportCardsHtml(c) : '<div class="empty-state">Ingen kunder endnu</div>';
+}
+
+function renderCustomerDetail() {
+  const el = document.getElementById('cust-detail');
+  const c = customers.find(x => x.spId === detailCustId);
+  if (!c) { el.innerHTML = '<div class="empty-state">Kunden blev ikke fundet</div>'; return; }
+  const m = calcCustomer(c), lvl = customerLevel(c), id = escH(c.spId);
+  const initials = c.name.split(/\s+/).filter(w => /^[A-ZÆØÅ]/.test(w)).slice(0, 2).map(w => w[0]).join('') || c.name.slice(0, 2).toUpperCase();
+  const worstLabel = !m.started ? 'Ikke gennemgået' : m.col === 'r' ? 'Kritiske fund' : m.col === 'o' ? 'Bør ses på' : 'Alt i orden';
+  const meta = [c.org_nr ? 'CVR ' + escH(c.org_nr) : '', c.users != null ? escH(c.users) + ' brugere' : '', c.am ? 'Account manager: ' + escH(c.am) : '', c.contact ? 'Kontakt: ' + escH(c.contact) : ''].filter(Boolean).join(' · ');
+  const head = `<div class="nd-card nd-head">
+    <div style="display:flex;gap:18px;align-items:center;min-width:0;">
+      <div class="nd-logo">${escH(initials)}</div>
+      <div style="min-width:0;">
+        <div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px;"><h1 style="font-size:22px;font-weight:600;">${escH(c.name)}</h1><span class="nd-chip ${ND_LVL[lvl].cls}">${ND_LVL[lvl].label}</span><span class="nd-chip ${ND_COL[m.col][0]}">${worstLabel}</span></div>
+        <div class="nd-muted" style="margin-top:6px;">${meta || '–'}</div>
+      </div>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;">
+      <button class="btn" onclick="goToCustomer('${id}')">Gennemgang</button>
+      <button class="btn" style="background:var(--accent);color:#fff;" onclick="reviewFor('${id}')">▶ Start review</button>
+      <button class="btn" onclick="openCustomerModal('${id}')">Rediger</button>
+    </div></div>`;
+  const tabs = `<div class="nd-tabs">${[['over','Overblik'],['rap','Rapporter'],['prof','Profil']].map(t => `<button class="nd-tab ${detailTab === t[0] ? 'on' : ''}" onclick="setDetailTab('${t[0]}')">${t[1]}</button>`).join('')}</div>`;
+  let body = '';
+  if (detailTab === 'over') {
+    body = `<div class="nd-kpis">
+      <div class="nd-kpi"><div class="nd-kpi-l">Dækning</div><div class="nd-kpi-v">${m.started ? ndPct(m.impl, m.total) : '–'}</div><div class="nd-kpi-s">${m.impl} af ${m.total} i orden</div></div>
+      <div class="nd-kpi"><div class="nd-kpi-l">Kritisk</div><div class="nd-kpi-v" style="color:#9e1c12">${m.crit}</div><div class="nd-kpi-s">skal tages fat på først</div></div>
+      <div class="nd-kpi"><div class="nd-kpi-l">Bør ses på</div><div class="nd-kpi-v" style="color:#8a3a06">${m.warn}</div><div class="nd-kpi-s">ikke kritisk</div></div>
+      <div class="nd-kpi"><div class="nd-kpi-l">Accepteret</div><div class="nd-kpi-v" style="color:#124aa6">${m.acc}</div><div class="nd-kpi-s">kendt og accepteret</div></div>
+      <div class="nd-kpi"><div class="nd-kpi-l">Kontroller i scope</div><div class="nd-kpi-v">${m.total}</div><div class="nd-kpi-s">${lvl === 'SMB' ? 'Premium SMB-standarden' : 'alle kontroller gennemgås'}</div></div></div>
+      <div class="nd-card" style="margin-bottom:1.25rem;"><h2>Områder</h2><div class="nd-areas">${m.areas.map(a => `<div class="nd-area"><div style="display:flex;align-items:center;gap:10px;"><span class="nd-dot ${ND_COL[a.col][1]}"></span><strong>${ND_AREAS[a.i]}</strong></div><span class="nd-chip ${ND_COL[a.col][0]}" style="align-self:flex-start;">${ND_COL[a.col][2]}</span><div class="nd-muted">${a.col === 'n' ? a.t + ' kontroller ikke vurderet' : a.impl + ' af ' + a.t + ' i orden' + (a.crit ? ' · ' + a.crit + ' kritisk' : '')}</div></div>`).join('')}</div></div>
+      <div class="nd-card"><h2>Fordeling</h2>${ndSegs(m)}</div>`;
+  } else if (detailTab === 'rap') {
+    body = reportCardsHtml(c);
+  } else {
+    const f = (l, v) => `<div><div class="nd-muted">${l}</div><div style="font-size:15px;font-weight:600;">${v ? escH(v) : '–'}</div></div>`;
+    body = `<div class="nd-card" style="max-width:720px;"><h2>Kundeprofil</h2><div class="nd-profile">${f('Niveau', ND_LVL[lvl].label)}${f('Antal brugere', c.users)}${f('Account manager', c.am)}${f('CVR', c.org_nr)}${f('Kontaktperson', c.contact)}${f('Kontrolscope', m.total + ' kontroller')}</div>
+      <div class="nd-muted" style="margin-top:18px;line-height:1.5;">${c.lvlSet ? '' : 'Niveauet er endnu ikke sat for denne kunde og vises som Premium Enterprise. Tryk Rediger for at vælge. '}Under 80 brugere = Premium SMB, 80 eller flere = Premium Enterprise.</div></div>`;
+  }
+  el.innerHTML = head + tabs + body;
 }
 
 function goToCustomer(spId) {
@@ -25689,6 +25969,7 @@ async function onCustomerChange() {
   selectedCustomer = customers.find(c => c.spId === spId);
   document.getElementById('checklist').innerHTML = '<div class="loading-state"><div class="spinner"></div> Henter vurderinger…</div>';
   await loadAssessments(spId);
+  assessmentsOwner = spId;
   openCard = null;
   renderChecklist();
 }
@@ -25702,7 +25983,7 @@ function setFilter(f, btn) {
 }
 
 function filteredChecks() {
-  return checks.filter(c => {
+  return scopedChecks(selectedCustomer).filter(c => {
     if (currentFilter === 'all') return true;
     return ((assessments[c.check_id] || assessments[c.spId] || {})?.status || 'none') === currentFilter;
   });
@@ -25853,15 +26134,18 @@ async function saveAssessment(spId) {
 }
 
 function updateProgress() {
-  if (!selectedCustomer || !checks.length) {
+  const lv = document.getElementById('tracker-level');
+  const list = selectedCustomer ? scopedChecks(selectedCustomer) : [];
+  if (lv) lv.innerHTML = selectedCustomer ? `<span class="nd-chip ${ND_LVL[customerLevel(selectedCustomer)].cls}">${ND_LVL[customerLevel(selectedCustomer)].label} · ${list.length} kontroller</span>` : '';
+  if (!selectedCustomer || !list.length) {
     document.getElementById('prog-label').textContent = '0 / 0';
     document.getElementById('prog-fill').style.width = '0%';
     return;
   }
-  const done = checks.filter(c => (assessments[c.check_id]?.status && assessments[c.check_id].status !== 'none') || ((assessments[c.check_id] || assessments[c.spId])?.status && (assessments[c.check_id] || assessments[c.spId])?.status !== 'none')).length;
-  const pct = Math.round(done/checks.length*100);
-  document.getElementById('prog-label').textContent = `${done} / ${checks.length} (${pct}%)`;
-  document.getElementById('prog-fill').style.width = pct+'%';
+  const done = list.filter(c => { const a = assessments[c.check_id] || assessments[c.spId]; return a && a.status && a.status !== 'none'; }).length;
+  const pct = Math.round(done / list.length * 100);
+  document.getElementById('prog-label').textContent = `${done} / ${list.length} (${pct}%)`;
+  document.getElementById('prog-fill').style.width = pct + '%';
 }
 
 function navStep(dir) {
@@ -25903,12 +26187,14 @@ const REPORT_LABELS = {
     licenseSection: 'Licensvurdering',
     area: 'OMRÅDE', control: 'CIS KONTROL', risk: 'RISK', impact: 'IMPACT',
     discussedWith: 'DISKUTERET MED', statusLabels: { implemented:'Implementeret', accepted:'Accepteret', review:'Under review', declined:'Afvist', none:'Ikke vurderet' },
-    noComment: 'Ingen kommentarer endnu.', noDescription: 'Ingen beskrivelse tilgængelig.', noLicense: 'Ingen licensvurdering angivet.',
+    continued: '(fortsat)', noComment: 'Ingen kommentarer endnu.', noDescription: 'Ingen beskrivelse tilgængelig.', noLicense: 'Ingen licensvurdering angivet.',
     toc: 'Indholdsfortegnelse',
     secOverview: 'Overview', secScope: 'Scope', secMethodology: 'Methodology', secAreas: 'Areas for Improvement',
     secFindings: 'Findings', secKeyFindings: 'Key Findings', secRecommendations: 'Strategic Recommendations', secConclusion: 'Conclusion',
     riskChartTitle: 'Kontrolpunkter fordelt efter risikoniveau',
-    impactRankingsTitle: 'IMPACT RANKINGS',
+    impactRankingsTitle: 'RISK & IMPACT RANKINGS',
+    riskRankingsSubtitle: 'Risk',
+    impactRankingsSubtitle: 'Impact',
     findingsIntro: 'Dette afsnit gennemgår de identificerede fund og deres potentielle konsekvens for organisationens sikkerhedsniveau. Det beskriver hvor forbedringer anbefales, og hvor der bør implementeres kontroller for at reducere risiko effektivt.',
     keyFindingsIntro: 'Herunder følger de vigtigste fund fra gennemgangen — de punkter der har størst potentiel konsekvens hvis de ikke adresseres.',
     recommendationsIntro: 'Baseret på de identificerede fund anbefales følgende tiltag prioriteret efter risiko.',
@@ -25925,12 +26211,14 @@ const REPORT_LABELS = {
     licenseSection: 'License Assessment',
     area: 'AREA', control: 'CIS CONTROL', risk: 'RISK', impact: 'IMPACT',
     discussedWith: 'DISCUSSED WITH', statusLabels: { implemented:'Implemented', accepted:'Accepted', review:'Under review', declined:'Declined', none:'Not assessed' },
-    noComment: 'No comments yet.', noDescription: 'No description available.', noLicense: 'No license assessment provided.',
+    continued: '(continued)', noComment: 'No comments yet.', noDescription: 'No description available.', noLicense: 'No license assessment provided.',
     toc: 'Table of Contents',
     secOverview: 'Overview', secScope: 'Scope', secMethodology: 'Methodology', secAreas: 'Areas for Improvement',
     secFindings: 'Findings', secKeyFindings: 'Key Findings', secRecommendations: 'Strategic Recommendations', secConclusion: 'Conclusion',
     riskChartTitle: 'Controls by Risk Level',
-    impactRankingsTitle: 'IMPACT RANKINGS',
+    impactRankingsTitle: 'RISK & IMPACT RANKINGS',
+    riskRankingsSubtitle: 'Risk',
+    impactRankingsSubtitle: 'Impact',
     findingsIntro: 'This section provides a detailed overview of the identified findings and their potential impact on the organization\u2019s security posture. It outlines where improvements are recommended and where controls should be implemented to mitigate risk effectively.',
     keyFindingsIntro: 'The following are the most significant findings from this review — the points with the greatest potential impact if left unaddressed.',
     recommendationsIntro: 'Based on the findings identified, the following actions are recommended, prioritized by risk.',
@@ -25998,6 +26286,19 @@ const IMPACT_RANKING_DEFS = {
   ]
 };
 
+const IMPACT_LEVEL_DEFS = {
+  da: [
+    ['HIGH', 'Høj impact betyder at implementering kan medføre mærkbar driftsforstyrrelse — fx krav om ny brugeradfærd, kommunikation til medarbejdere, eller risiko for at eksisterende arbejdsgange midlertidigt påvirkes.'],
+    ['MEDIUM', 'Middel impact betyder at implementering kræver en vis administrativ indsats eller kan give enkelte brugere en mindre, kortvarig påvirkning, men uden større driftsforstyrrelse.'],
+    ['LOW', 'Lav impact betyder at ændringen typisk foregår i baggrunden uden mærkbar effekt for slutbrugerne, og kan implementeres med minimal risiko for driftsforstyrrelse.'],
+  ],
+  en: [
+    ['HIGH', 'High impact means implementation can cause noticeable operational disruption — for example requiring new user behavior, communication to staff, or a temporary effect on existing workflows.'],
+    ['MEDIUM', 'Medium impact means implementation requires some administrative effort or may cause a minor, short-lived effect for some users, without major operational disruption.'],
+    ['LOW', 'Low impact means the change typically happens in the background with no noticeable effect for end users, and can be implemented with minimal risk of disruption.'],
+  ]
+};
+
 const OVERVIEW_TEXT = {
   da: 'Denne Security Baseline-rapport giver en dybdegående analyse af sikkerhedstilstanden i {CUSTOMER}s Microsoft 365-miljø, med fokus på Entra ID, Exchange Online, SharePoint, OneDrive og Teams. Vurderingen er foretaget op mod CIS Microsoft 365 Foundations Benchmark v7.0.0 og omfatter en gennemgang af Conditional Access-politikker, compliance-indstillinger og generel sikkerhedskonfiguration. Formålet er at identificere potentielle risici og sårbarheder samt anbefale kontroller der beskytter fortroligheden, integriteten og tilgængeligheden af organisationens digitale aktiver.\n\nRapporten giver indsigt i sikkerhedstilstanden på tværs af centrale områder — herunder adgangsstyring, auditlog og databeskyttelse — og understreger vigtigheden af en proaktiv tilgang til Microsoft 365-sikkerhed. De efterfølgende fund og anbefalinger danner grundlag for velinformerede beslutninger og en effektiv, prioriteret handlingsplan.',
   en: 'This Security Baseline Report provides an in-depth analysis of the security posture of {CUSTOMER}\u2019s Microsoft 365 environment, focusing on Entra ID, Exchange Online, SharePoint, OneDrive, and Teams. The assessment is conducted against the CIS Microsoft 365 Foundations Benchmark v7.0.0 and includes a review of Conditional Access policies, compliance settings, and overall security configuration. The objective is to identify potential risks and vulnerabilities and to recommend controls that protect the confidentiality, integrity, and availability of the organization\u2019s digital assets.\n\nThe report provides insight into the security posture across key domains — including access control, audit logging, and data protection — and underscores the importance of a proactive approach to Microsoft 365 security. The findings and recommendations that follow form the basis for informed decision-making and an effective, prioritized action plan.'
@@ -26050,13 +26351,21 @@ function computeTopLists(checksArr, assessmentsObj) {
   return { critical, good };
 }
 
+async function withReportScope(fn) {
+  const full = checks;
+  try {
+    if (selectedCustomer) checks = scopedChecks(selectedCustomer);
+    return await fn();
+  } finally { checks = full; }
+}
+
 async function doGeneratePDF() {
   const score = document.getElementById('pdf-score').value;
   const noteConstraints = document.getElementById('pdf-note-constraints').value.trim();
   const noteNext = document.getElementById('pdf-note-next').value.trim();
   const noteLicense = document.getElementById('pdf-note-license').value.trim();
   const lang = document.querySelector('input[name="pdf-lang"]:checked')?.value || 'da';
-  await generatePDFWithMeta(score, noteConstraints, noteNext, lang, noteLicense);
+  await withReportScope(() => generatePDFWithMeta(score, noteConstraints, noteNext, lang, noteLicense));
 }
 
 async function doGenerateWord() {
@@ -26065,7 +26374,7 @@ async function doGenerateWord() {
   const noteNext = document.getElementById('pdf-note-next').value.trim();
   const noteLicense = document.getElementById('pdf-note-license').value.trim();
   const lang = document.querySelector('input[name="pdf-lang"]:checked')?.value || 'da';
-  await generateWordReport(score, noteConstraints, noteNext, lang, noteLicense);
+  await withReportScope(() => generateWordReport(score, noteConstraints, noteNext, lang, noteLicense));
 }
 
 async function generateWordReport(score, noteConstraints, noteNext, lang, licenseText) {
@@ -26244,9 +26553,17 @@ async function generateWordReport(score, noteConstraints, noteNext, lang, licens
       });
     }
     children.push(h2(L.impactRankingsTitle));
+    children.push(new Paragraph({spacing:{after:60},children:[txt(L.riskRankingsSubtitle,{bold:true,size:19,color:COLOR_DARK})]}));
     IMPACT_RANKING_DEFS[lang||'da'].forEach(([label,def])=>{
       children.push(new Paragraph({spacing:{after:100},children:[
         txt(label+': ',{bold:true,size:18,color:riskColors[label.charAt(0)+label.slice(1).toLowerCase()]||COLOR_DARK}),
+        txt(def,{size:18})
+      ]}));
+    });
+    children.push(new Paragraph({spacing:{after:60},children:[txt(L.impactRankingsSubtitle,{bold:true,size:19,color:COLOR_DARK})]}));
+    IMPACT_LEVEL_DEFS[lang||'da'].forEach(([label,def])=>{
+      children.push(new Paragraph({spacing:{after:100},children:[
+        txt(label+': ',{bold:true,size:18,color:impactColors[label.charAt(0)+label.slice(1).toLowerCase()]||COLOR_DARK}),
         txt(def,{size:18})
       ]}));
     });
@@ -26277,7 +26594,7 @@ async function generateWordReport(score, noteConstraints, noteNext, lang, licens
 
     // Group checks by section
     const sections = {};
-    checks.forEach(c => { const sec = c.section || 'Andet'; if(!sections[sec]) sections[sec]=[]; sections[sec].push(c); });
+    [...checks].sort((x,y)=>String(x.check_id).localeCompare(String(y.check_id), undefined, {numeric:true})).forEach(c => { const sec = c.section || 'Andet'; if(!sections[sec]) sections[sec]=[]; sections[sec].push(c); });
 
     const tableRows = [headerRow()];
 
@@ -26552,6 +26869,7 @@ async function generatePDFWithMeta(score, noteConstraints, noteNext, lang, licen
     const riskCounts = {Critical:0,High:0,Medium:0,Low:0};
     checks.forEach(c=>{ riskCounts[c.risk_level||'Medium']++; });
     const barColors = {Critical:[185,28,28],High:[234,88,12],Medium:[217,119,6],Low:[37,99,235]};
+    const impactColors={High:[67,56,202],Medium:[3,105,161],Low:[71,85,105]};
     const maxRiskCount = Math.max(...Object.values(riskCounts),1);
     chk(9 + 4*9 + 6);
     doc.setFillColor(29,78,216); doc.rect(ml,y,cw,7,'F');
@@ -26644,9 +26962,21 @@ async function generatePDFWithMeta(score, noteConstraints, noteNext, lang, licen
     chk(14);
     doc.setFontSize(11); doc.setFont('helvetica','bold'); doc.setTextColor(29,78,216);
     doc.text(L.impactRankingsTitle, ml, y+5); y += 10;
+    chk(6);
+    doc.setFontSize(9.5); doc.setFont('helvetica','bold'); doc.setTextColor(17,24,39);
+    doc.text(L.riskRankingsSubtitle, ml, y+3); y += 6;
     IMPACT_RANKING_DEFS[lang||'da'].forEach(([label, def])=>{
       drawTitledBlock({
         title: label, titleSize: 8.5, titleColor: (barColors[label.charAt(0)+label.slice(1).toLowerCase()]||[55,65,81]), titleLineH: 5,
+        body: def, bodySize: 8, bodyColor: [75,85,99], bodyWidth: cw-4, bodyLineH: 4.1, gapAfterTitle: 0, gapAfterBlock: 6
+      });
+    });
+    chk(6);
+    doc.setFontSize(9.5); doc.setFont('helvetica','bold'); doc.setTextColor(17,24,39);
+    doc.text(L.impactRankingsSubtitle, ml, y+3); y += 6;
+    IMPACT_LEVEL_DEFS[lang||'da'].forEach(([label, def])=>{
+      drawTitledBlock({
+        title: label, titleSize: 8.5, titleColor: (impactColors[label.charAt(0)+label.slice(1).toLowerCase()]||[55,65,81]), titleLineH: 5,
         body: def, bodySize: 8, bodyColor: [75,85,99], bodyWidth: cw-4, bodyLineH: 4.1, gapAfterTitle: 0, gapAfterBlock: 6
       });
     });
@@ -26699,14 +27029,13 @@ async function generatePDFWithMeta(score, noteConstraints, noteNext, lang, licen
     const statusLabels=L.statusLabels;
     const riskColors={Critical:[185,28,28],High:[194,65,12],Medium:[180,83,9],Low:[21,128,61]};
     const riskBg={Critical:[254,242,242],High:[255,247,237],Medium:[255,251,235],Low:[240,253,244]};
-    const impactColors={High:[67,56,202],Medium:[3,105,161],Low:[71,85,105]};
     const impactBg={High:[238,242,255],Medium:[240,249,255],Low:[248,250,252]};
     const lineH = 3.3;
     const fs = 6.8;
 
     // Group checks by section
     const sections = {};
-    checks.forEach(c => { const sec = c.section || 'Andet'; if(!sections[sec]) sections[sec]=[]; sections[sec].push(c); });
+    [...checks].sort((x,y)=>String(x.check_id).localeCompare(String(y.check_id), undefined, {numeric:true})).forEach(c => { const sec = c.section || 'Andet'; if(!sections[sec]) sections[sec]=[]; sections[sec].push(c); });
 
     for(const [secName, secChecks] of Object.entries(sections)) {
       if(chk(9)) drawTableHeader();
@@ -26734,16 +27063,35 @@ async function generatePDFWithMeta(score, noteConstraints, noteNext, lang, licen
         const h4 = (impactTextLines.length+1)*lineH + 3;
         const h5 = discussLines.length*lineH + 2;
         let rowH = Math.max(h1,h2,h3,h4,h5, 12);
-
-        if(chk(rowH+1)) drawTableHeader();
+        const leftH = Math.max(h1,h2,h3,h4, 12);
+        const maxBodyH = (ph-16) - 15 - 7 - 2;      // tallest row that fits on a fresh page below the table header
+        const oversize = rowH > maxBodyH;
+        // Normal rows move to the next page as a whole (unchanged). Only a row taller than a whole page
+        // (a very long note) is split: the first part fills the current page and the rest continues in the
+        // comment column on the next page(s) – so no text is ever cut off.
+        let remaining = discussLines.slice(); let firstFrag = true;
+        while (firstFrag || remaining.length) {
+          let fragLines, fragH; const showLeft = firstFrag;
+          if (!oversize) {
+            fragLines = remaining; remaining = []; fragH = rowH;
+            if(chk(fragH+1)) drawTableHeader();
+          } else {
+            const need = (firstFrag ? leftH : 12) + 2 + lineH*2;
+            if (y + need > ph-16) { newPage(); drawTableHeader(); }
+            const avail = (ph-16) - y - 1;
+            const maxLines = Math.max(2, Math.floor((avail - 2) / lineH));
+            fragLines = remaining.slice(0, maxLines); remaining = remaining.slice(maxLines);
+            fragH = Math.max(firstFrag ? leftH : 12, fragLines.length*lineH + 2);
+          }
 
         // Row background + left status bar + borders
-        doc.setFillColor(252,252,253); doc.rect(ml,y,cw,rowH,'F');
+        doc.setFillColor(252,252,253); doc.rect(ml,y,cw,fragH,'F');
         doc.setDrawColor(229,231,235);
-        doc.rect(ml,y,cw,rowH,'S');
-        for(let i=1;i<5;i++){ doc.line(colX[i],y,colX[i],y+rowH); }
-        doc.setFillColor(...(statusColors[status]||statusColors.none)); doc.rect(ml,y,1.3,rowH,'F');
+        doc.rect(ml,y,cw,fragH,'S');
+        for(let i=1;i<5;i++){ doc.line(colX[i],y,colX[i],y+fragH); }
+        doc.setFillColor(...(statusColors[status]||statusColors.none)); doc.rect(ml,y,1.3,fragH,'F');
 
+        if(showLeft){
         // Kolonne 1: Område
         doc.setFont('helvetica','bold'); doc.setFontSize(fs); doc.setTextColor(31,41,55);
         let cy = y+3.6;
@@ -26774,14 +27122,22 @@ async function generatePDFWithMeta(score, noteConstraints, noteNext, lang, licen
         doc.text(L.impact+': '+impactLevel.toUpperCase(), colX[3]+4, y+4.4);
         doc.setFontSize(fs); doc.setFont('helvetica','normal'); doc.setTextColor(55,65,81);
         doc.text(impactTextLines, colX[3]+2, y+1.6+4.2+lineH);
+        } else {
+          doc.setFontSize(6.3); doc.setFont('helvetica','bold'); doc.setTextColor(59,130,246);
+          doc.text(c.check_id, colX[1]+2, y+3.6);
+          doc.setFont('helvetica','italic'); doc.setTextColor(156,163,175);
+          doc.text(L.continued, colX[1]+colW[1]-2, y+3.6, {align:'right'});
+        }
 
         // Kolonne 5: Diskuteret med kunden
         doc.setFontSize(fs);
         doc.setFont('helvetica', comment ? 'normal' : 'italic');
         doc.setTextColor(comment ? 55 : 156, comment ? 65 : 163, comment ? 81 : 175);
-        doc.text(discussLines, colX[4]+2, y+3.6);
+        doc.text(fragLines, colX[4]+2, y+3.6);
 
-        y += rowH + 1.5;
+        y += fragH + 1.5;
+        firstFrag = false;
+        }
       }
       y += 3;
     }
@@ -26864,21 +27220,36 @@ async function generatePDFWithMeta(score, noteConstraints, noteNext, lang, licen
 
 // ── CUSTOMERS CRUD ────────────────────────────────
 function renderCustomersTable() {
-  const rows = customers.map(c => `
-    <tr>
-      <td class="td-name">${c.name}</td>
-      <td>${c.org_nr||'–'}</td>
-      <td>${c.contact||'–'}</td>
-      <td class="td-actions">
-        <button class="btn btn-sm" onclick="openCustomerModal('${c.spId}')">Rediger</button>
-        <button class="btn btn-sm btn-danger" onclick="deleteCustomer('${c.spId}')">Arkivér</button>
-      </td>
-    </tr>`).join('');
-  document.getElementById('customers-table').innerHTML = `
+  const el = document.getElementById('customers-table');
+  if (!el) return;
+  const q = (document.getElementById('cust-search')?.value || '').trim().toLowerCase();
+  const list = customers.filter(c => (custLvlFilter === 'alle' || customerLevel(c) === custLvlFilter) && (!q || c.name.toLowerCase().includes(q)));
+  const rows = list.map(c => {
+    const m = calcCustomer(c), lvl = customerLevel(c), id = escH(c.spId);
+    return `<tr>
+      <td><button class="nd-link" onclick="openCustomer('${id}')">${escH(c.name)}</button><div class="nd-muted">${m.started ? 'Aktiv' : 'Ikke gennemgået'}</div></td>
+      <td><span class="nd-chip ${ND_LVL[lvl].cls}">${ND_LVL[lvl].label}</span></td>
+      <td>${c.users != null ? escH(c.users) : '–'}</td>
+      <td>${escH(c.am) || '–'}</td>
+      <td><div class="nd-cov"><div class="nd-bar"><div class="nd-sg" style="width:${m.started ? m.impl*100/m.total : 0}%"></div></div><strong style="font-size:13px;min-width:38px;">${m.started ? ndPct(m.impl, m.total) : '–'}</strong></div></td>
+      <td><span class="nd-chip ${m.started ? (m.crit ? 'nd-r' : 'nd-g') : 'nd-n'}">${m.started ? m.crit : '–'}</span></td>
+      <td>${escH(c.org_nr) || '–'}</td>
+      <td><div class="td-actions">
+        <button class="btn btn-sm" onclick="openCustomerModal('${id}')">Rediger</button>
+        <button class="btn btn-sm btn-danger" onclick="deleteCustomer('${id}')">Arkivér</button>
+      </div></td>
+    </tr>`;
+  }).join('');
+  el.innerHTML = `
     <table>
-      <thead><tr><th>Navn</th><th>CVR</th><th>Kontakt</th><th>Handlinger</th></tr></thead>
-      <tbody>${rows||'<tr><td colspan="4" class="empty-state">Ingen kunder endnu</td></tr>'}</tbody>
+      <thead><tr><th>Kunde</th><th>Niveau</th><th>Brugere</th><th>Account manager</th><th>Dækning</th><th>Kritisk</th><th>CVR</th><th></th></tr></thead>
+      <tbody>${rows || '<tr><td colspan="8" class="empty-state">Ingen kunder matcher</td></tr>'}</tbody>
     </table>`;
+}
+
+function suggestLevel() {
+  const v = parseInt(document.getElementById('customer-users').value, 10);
+  if (!lvlTouched && !isNaN(v)) document.getElementById('customer-lvl').value = v < 80 ? 'SMB' : 'ENT';
 }
 
 function openCustomerModal(spId) {
@@ -26888,6 +27259,10 @@ function openCustomerModal(spId) {
   document.getElementById('customer-name').value = c?.name||'';
   document.getElementById('customer-orgnr').value = c?.org_nr||'';
   document.getElementById('customer-contact').value = c?.contact||'';
+  document.getElementById('customer-lvl').value = customerLevel(c);
+  document.getElementById('customer-users').value = c && c.users != null ? c.users : '';
+  document.getElementById('customer-am').value = c?.am||'';
+  lvlTouched = !!(c && c.lvlSet);
   document.getElementById('modal-customer').classList.add('open');
 }
 
@@ -26895,7 +27270,15 @@ async function saveCustomer() {
   const spId = document.getElementById('customer-sp-id').value;
   const name = document.getElementById('customer-name').value.trim();
   if (!name) { showToast('Navn påkrævet','error'); return; }
-  const fields = { CustomerName:name, OrgNr:document.getElementById('customer-orgnr').value, Contact:document.getElementById('customer-contact').value, Active:true }; const data = fields;
+  const usersRaw = document.getElementById('customer-users').value;
+  const meta = { lvl: document.getElementById('customer-lvl').value === 'SMB' ? 'SMB' : 'ENT' };
+  if (usersRaw !== '' && !isNaN(parseInt(usersRaw, 10))) meta.users = parseInt(usersRaw, 10);
+  const am = document.getElementById('customer-am').value.trim();
+  if (am) meta.am = am;
+  const contactText = document.getElementById('customer-contact').value.trim();
+  const contactFull = (contactText + ' [[ADD:' + JSON.stringify(meta) + ']]').trim();
+  if (contactFull.length > 250) { showToast('Kontaktperson/account manager er for lang','error'); return; }
+  const fields = { CustomerName:name, OrgNr:document.getElementById('customer-orgnr').value, Contact:contactFull, Active:true }; const data = fields;
   try {
     if (APP_CONFIG.demoMode) {
       if (spId) { const c=demoData.customers.find(x=>x.spId===spId); if(c){c.CustomerName=name;c.OrgNr=fields.OrgNr;c.Contact=fields.Contact;} }
@@ -26909,6 +27292,7 @@ async function saveCustomer() {
     renderCustomersTable();
     renderCustomerSelect();
     renderDashboard();
+    if (document.getElementById('page-customer').classList.contains('active')) renderCustomerDetail();
     showToast('Kunde gemt ✓','success');
   } catch(e) { showToast(e.message,'error'); }
 }
@@ -27179,8 +27563,15 @@ initMsal();
       <div class="form-group"><label>Kundenavn *</label><input type="text" id="customer-name" placeholder="Acme Corp A/S"></div>
       <div class="form-row">
         <div class="form-group"><label>CVR / Org.nr</label><input type="text" id="customer-orgnr" placeholder="12345678"></div>
-        <div class="form-group"><label>Kontaktperson</label><input type="text" id="customer-contact" placeholder="Navn, email"></div>
+        <div class="form-group"><label>Kontaktperson</label><input type="text" id="customer-contact" placeholder="Navn, email" maxlength="120"></div>
       </div>
+      <div class="form-row">
+        <div class="form-group"><label>Niveau</label>
+          <select id="customer-lvl" onchange="lvlTouched=true"><option value="ENT">Premium Enterprise (80+ brugere)</option><option value="SMB">Premium SMB (under 80 brugere)</option></select>
+        </div>
+        <div class="form-group"><label>Antal brugere</label><input type="number" id="customer-users" min="0" placeholder="fx 42" oninput="suggestLevel()"></div>
+      </div>
+      <div class="form-group"><label>Account manager</label><input type="text" id="customer-am" placeholder="Navn" maxlength="60"></div>
     </div>
     <div class="modal-footer">
       <button class="btn" onclick="closeModal('modal-customer')">Annuller</button>
