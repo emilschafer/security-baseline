@@ -802,6 +802,9 @@ tbody tr:hover td { background: var(--bg); }
 .nd-ent { background:#e0e7ff; color:#2f3d9a; } .nd-smb { background:#d5f0f2; color:#0a5c64; }
 .nd-g { background:#dcf3e6; color:#17633f; } .nd-o { background:#ffe8cc; color:#8a3a06; } .nd-r { background:#fde0dd; color:#9e1c12; } .nd-b { background:#dbe8fd; color:#124aa6; } .nd-n { background:#e8eaef; color:#47505f; }
 .nd-dot { display:inline-block; width:10px; height:10px; border-radius:50%; flex:none; }
+.nd-p { background:#ede9fe; color:#5b21b6; } .nd-dot-p { background:#7c3aed; } .nd-sp { background:#7c3aed; }
+.s-option { background:#f5f3ff; color:#6d28d9; border:1px solid #ddd6fe; }
+.status-btn.sel-option { background:#f5f3ff; color:#6d28d9; border-color:#ddd6fe; }
 .nd-dot-g { background:#1f8a57; } .nd-dot-o { background:#e07a10; } .nd-dot-r { background:#c8281b; } .nd-dot-b { background:#2a6fe0; } .nd-dot-n { background:#98a1b0; }
 .nd-bar { display:flex; height:10px; border-radius:99px; overflow:hidden; background:#e8eaef; }
 .nd-sg { background:#1f8a57; } .nd-so { background:#e07a10; } .nd-sr { background:#c8281b; } .nd-sb { background:#2a6fe0; } .nd-sn { background:#b9c0cc; }
@@ -970,6 +973,7 @@ tbody tr:hover td { background: var(--bg); }
         <button class="filter-btn" onclick="setFilter('implemented',this)">Implemented</button>
         <button class="filter-btn" onclick="setFilter('review',this)">Under review</button>
         <button class="filter-btn" onclick="setFilter('accepted',this)">Accepted</button>
+        <button class="filter-btn" onclick="setFilter('option',this)">Tilvalg</button>
         <button class="filter-btn" onclick="setFilter('declined',this)">Declined</button>
       </div>
       <div id="checklist"></div>
@@ -24148,6 +24152,20 @@ function closeReview() {
   reviewMsalInstance = null;
 }
 
+const REVIEW_REQUIRED_SCOPES = ['Directory.Read.All','Policy.Read.All','Group.Read.All','AccessReview.Read.All','SecurityEvents.Read.All','RoleManagement.Read.Directory','RoleManagementPolicy.Read.Directory','SharePointTenantSettings.Read.All','DeviceManagementServiceConfig.Read.All','TeamworkAppSettings.Read.All'];
+
+function tokenScopes(tok) {
+  try {
+    const p = JSON.parse(atob(tok.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+    return String(p.scp || '').split(' ').filter(Boolean);
+  } catch (e) { return null; }
+}
+function missingReviewScopes(tok) {
+  const have = tokenScopes(tok);
+  if (!have) return [];
+  return REVIEW_REQUIRED_SCOPES.filter(s => !have.includes(s));
+}
+
 async function doReviewLogin() {
   try {
     reviewMsalInstance = new msal.PublicClientApplication({
@@ -24161,10 +24179,27 @@ async function doReviewLogin() {
     await reviewMsalInstance.initialize();
 
     // .default scope giver alle tilladte permissions i ét kald
-    const resp = await reviewMsalInstance.loginPopup({
+    let resp = await reviewMsalInstance.loginPopup({
       scopes: ['https://graph.microsoft.com/.default'],
       prompt: 'select_account'
     });
+
+    // Tjek hvilke rettigheder kundens tenant faktisk har godkendt, og bed om samtykke hvis noget mangler
+    let missing = missingReviewScopes(resp.accessToken);
+    if (missing.length) {
+      const ok = confirm('Appen mangler godkendelse i kundens tenant (' + resp.account.tenantId + ') til:\n\n' + missing.join('\n') + '\n\nTryk OK for at bede om samtykke nu. Log ind som administrator hos kunden og sæt flueben i "Samtykke på vegne af din organisation".');
+      if (ok) {
+        resp = await reviewMsalInstance.loginPopup({
+          scopes: ['https://graph.microsoft.com/.default'],
+          prompt: 'consent',
+          account: resp.account
+        });
+        missing = missingReviewScopes(resp.accessToken);
+      }
+      if (missing.length) {
+        showToast('Mangler stadig: ' + missing.join(', ') + '. Review fortsætter, men nogle kontroller bliver ikke vurderet.', 'error');
+      }
+    }
 
     reviewMsalInstance.setActiveAccount(resp.account);
     reviewToken = resp.accessToken;
@@ -25737,7 +25772,7 @@ async function downloadLatestReport(customerId, customerName) {
 const ND_AREAS = ['Brugere og licenser','Deling og samarbejde','Mailsikkerhed','Adgangskontrol','Enheder og app-beskyttelse','Apps med adgang til data','Defender, overvågning og databeskyttelse'];
 const SMB_CHECK_IDS = new Set(["1.1.1", "1.1.2", "1.1.3", "1.1.4", "1.2.2", "1.3.1", "1.3.2", "1.3.3", "1.3.4", "1.3.5", "2.1.1", "2.1.2", "2.1.3", "2.1.4", "2.1.5", "2.1.6", "2.1.7", "2.1.8", "2.1.9", "2.1.10", "2.1.12", "2.1.13", "2.1.14", "2.1.15", "2.4.5", "3.1.1", "3.3.1", "4.1", "4.2", "5.1.2.1", "5.1.2.2", "5.1.2.3", "5.1.2.4", "5.1.3.1", "5.1.3.3", "5.1.3.4", "5.1.4.2", "5.1.4.3", "5.1.4.4", "5.1.4.5", "5.1.5.1", "5.1.5.2", "5.1.5.4", "5.1.5.5", "5.1.5.6", "5.1.6.2", "5.2.2.1", "5.2.2.2", "5.2.2.4", "5.2.2.5", "5.2.2.9", "5.2.2.10", "5.2.2.11", "5.2.2.12", "5.2.2.13", "5.2.2.14", "5.2.2.15", "5.2.2.16", "5.2.2.17", "5.2.3.1", "5.2.3.2", "5.2.3.4", "5.2.3.5", "5.2.3.6", "5.2.3.8", "5.2.3.9", "5.2.3.10", "5.2.4.1", "5.2.4.3", "5.2.4.4", "5.2.4.5", "6.1.1", "6.1.2", "6.1.3", "6.2.1", "6.2.2", "6.2.3", "6.3.1", "6.3.2", "6.5.1", "6.5.2", "6.5.4", "6.5.5", "7.2.1", "7.2.2", "7.2.3", "7.2.4", "7.2.6", "7.2.7", "7.2.9", "7.2.10", "7.2.11", "7.3.1", "8.1.2", "8.2.1", "8.2.2", "8.2.3", "8.2.4", "8.4.1", "8.5.2", "8.5.3", "8.5.4", "8.5.7", "8.6.1"]);
 const ND_LVL = { ENT:{label:'Premium Enterprise', cls:'nd-ent'}, SMB:{label:'Premium SMB', cls:'nd-smb'} };
-const ND_COL = { g:['nd-g','nd-dot-g','I orden'], o:['nd-o','nd-dot-o','Bør ses på'], r:['nd-r','nd-dot-r','Kritisk'], b:['nd-b','nd-dot-b','Accepteret'], n:['nd-n','nd-dot-n','Ikke vurderet'] };
+const ND_COL = { g:['nd-g','nd-dot-g','I orden'], o:['nd-o','nd-dot-o','Bør ses på'], r:['nd-r','nd-dot-r','Kritisk'], b:['nd-b','nd-dot-b','Accepteret'], p:['nd-p','nd-dot-p','Tilvalg'], n:['nd-n','nd-dot-n','Ikke vurderet'] };
 
 function escH(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch])); }
 function ndPct(a, b) { return b > 0 ? Math.round(a * 100 / b) + '%' : '–'; }
@@ -25783,21 +25818,22 @@ async function loadAllAssessments() {
 
 function calcCustomer(cust) {
   const ass = allAssessments[cust.spId] || {};
-  const areas = ND_AREAS.map((n, i) => ({ i, t: 0, impl: 0, crit: 0, warn: 0, acc: 0, na: 0 }));
+  const areas = ND_AREAS.map((n, i) => ({ i, t: 0, impl: 0, crit: 0, warn: 0, acc: 0, opt: 0, na: 0 }));
   scopedChecks(cust).forEach(c => {
     const a = areas[areaOfCheck(c)];
     const s = (ass[c.check_id] || ass[c.spId] || {}).status || 'none';
     a.t++;
     if (s === 'implemented') a.impl++;
     else if (s === 'accepted') a.acc++;
+    else if (s === 'option') a.opt++;
     else if (s === 'none') a.na++;
     else if (c.risk_level === 'Critical') a.crit++;
     else a.warn++;
   });
-  const m = { areas, impl: 0, crit: 0, warn: 0, acc: 0, na: 0, total: 0 };
+  const m = { areas, impl: 0, crit: 0, warn: 0, acc: 0, opt: 0, na: 0, total: 0 };
   areas.forEach(a => {
     a.col = (a.t - a.na === 0) ? 'n' : a.crit ? 'r' : a.warn ? 'o' : 'g';
-    ['impl','crit','warn','acc','na'].forEach(k => m[k] += a[k]);
+    ['impl','crit','warn','acc','opt','na'].forEach(k => m[k] += a[k]);
     m.total += a.t;
   });
   m.started = m.na < m.total;
@@ -25806,7 +25842,7 @@ function calcCustomer(cust) {
 }
 
 function ndSegs(m) {
-  const d = [['nd-sg','nd-dot-g','I orden',m.impl],['nd-sr','nd-dot-r','Kritisk',m.crit],['nd-so','nd-dot-o','Bør ses på',m.warn],['nd-sb','nd-dot-b','Accepteret',m.acc],['nd-sn','nd-dot-n','Ikke vurderet',m.na]];
+  const d = [['nd-sg','nd-dot-g','I orden',m.impl],['nd-sr','nd-dot-r','Kritisk',m.crit],['nd-so','nd-dot-o','Bør ses på',m.warn],['nd-sb','nd-dot-b','Accepteret',m.acc],['nd-sp','nd-dot-p','Tilvalg',m.opt],['nd-sn','nd-dot-n','Ikke vurderet',m.na]];
   const bar = '<div class="nd-bar" style="height:14px;">' + d.map(x => `<div class="${x[0]}" style="width:${m.total ? x[3]*100/m.total : 0}%"></div>`).join('') + '</div>';
   const leg = '<div class="nd-legend">' + d.map(x => `<span><span class="nd-dot ${x[1]}"></span>${x[2]} <strong>${x[3]}</strong></span>`).join('') + '</div>';
   return bar + leg;
@@ -25848,8 +25884,8 @@ function renderDashboard() {
     right = `<h2>Kræver opmærksomhed</h2><div style="overflow-x:auto;"><table><thead><tr><th>Kunde</th><th>Niveau</th><th>Kritisk</th><th>Bør ses på</th></tr></thead><tbody>${rows || '<tr><td colspan="4" class="empty-state">Ingen gennemgåede kunder endnu</td></tr>'}</tbody></table></div>`;
   }
   document.getElementById('dash-cards').innerHTML = `<div class="nd-card"><h2>Dækning pr. område</h2><div style="display:flex;flex-direction:column;gap:14px;">${areaRows}</div></div><div class="nd-card">${right}</div>`;
-  const tot = { impl: 0, crit: 0, warn: 0, acc: 0, na: 0, total: 0 };
-  const sm = one ? M[one.spId] : started.reduce((o, c) => { ['impl','crit','warn','acc','na','total'].forEach(k => o[k] += M[c.spId][k]); return o; }, tot);
+  const tot = { impl: 0, crit: 0, warn: 0, acc: 0, opt: 0, na: 0, total: 0 };
+  const sm = one ? M[one.spId] : started.reduce((o, c) => { ['impl','crit','warn','acc','opt','na','total'].forEach(k => o[k] += M[c.spId][k]); return o; }, tot);
   document.getElementById('dash-status').innerHTML = '<h2>Status for ' + (one ? 'kundens kontroller' : 'alle kontroller') + '</h2>' + ndSegs(sm);
 }
 
@@ -25936,8 +25972,9 @@ function renderCustomerDetail() {
       <div class="nd-kpi"><div class="nd-kpi-l">Kritisk</div><div class="nd-kpi-v" style="color:#9e1c12">${m.crit}</div><div class="nd-kpi-s">skal tages fat på først</div></div>
       <div class="nd-kpi"><div class="nd-kpi-l">Bør ses på</div><div class="nd-kpi-v" style="color:#8a3a06">${m.warn}</div><div class="nd-kpi-s">ikke kritisk</div></div>
       <div class="nd-kpi"><div class="nd-kpi-l">Accepteret</div><div class="nd-kpi-v" style="color:#124aa6">${m.acc}</div><div class="nd-kpi-s">kendt og accepteret</div></div>
+      <div class="nd-kpi"><div class="nd-kpi-l">Tilvalg</div><div class="nd-kpi-v" style="color:#5b21b6">${m.opt}</div><div class="nd-kpi-s">kan tilkøbes eller vælges til</div></div>
       <div class="nd-kpi"><div class="nd-kpi-l">Kontroller i scope</div><div class="nd-kpi-v">${m.total}</div><div class="nd-kpi-s">${lvl === 'SMB' ? 'Premium SMB-standarden' : 'alle kontroller gennemgås'}</div></div></div>
-      <div class="nd-card" style="margin-bottom:1.25rem;"><h2>Områder</h2><div class="nd-areas">${m.areas.map(a => `<div class="nd-area"><div style="display:flex;align-items:center;gap:10px;"><span class="nd-dot ${ND_COL[a.col][1]}"></span><strong>${ND_AREAS[a.i]}</strong></div><span class="nd-chip ${ND_COL[a.col][0]}" style="align-self:flex-start;">${ND_COL[a.col][2]}</span><div class="nd-muted">${a.col === 'n' ? a.t + ' kontroller ikke vurderet' : a.impl + ' af ' + a.t + ' i orden' + (a.crit ? ' · ' + a.crit + ' kritisk' : '')}</div></div>`).join('')}</div></div>
+      <div class="nd-card" style="margin-bottom:1.25rem;"><h2>Områder</h2><div class="nd-areas">${m.areas.map(a => `<div class="nd-area"><div style="display:flex;align-items:center;gap:10px;"><span class="nd-dot ${ND_COL[a.col][1]}"></span><strong>${ND_AREAS[a.i]}</strong></div><span class="nd-chip ${ND_COL[a.col][0]}" style="align-self:flex-start;">${ND_COL[a.col][2]}</span><div class="nd-muted">${a.col === 'n' ? a.t + ' kontroller ikke vurderet' : a.impl + ' af ' + a.t + ' i orden' + (a.crit ? ' · ' + a.crit + ' kritisk' : '') + (a.opt ? ' · ' + a.opt + ' tilvalg' : '')}</div></div>`).join('')}</div></div>
       <div class="nd-card"><h2>Fordeling</h2>${ndSegs(m)}</div>`;
   } else if (detailTab === 'rap') {
     body = reportCardsHtml(c);
@@ -26026,7 +26063,7 @@ function renderChecklist() {
 
 function renderCard(c) {
   var a = assessments[c.check_id] || { status: 'none', comment: '' };
-  var labels = { none:'Ikke vurderet', implemented:'Implemented', declined:'Declined', review:'Under review', accepted:'Accepted' };
+  var labels = { none:'Ikke vurderet', implemented:'Implemented', declined:'Declined', review:'Under review', accepted:'Accepted', option:'Tilvalg' };
   var isOpen = openCard === c.spId;
   var activeTab = cardTabs[c.spId] || 'overview';
   var profileTags = c.profiles.map(function(p) { return '<span class="tag ' + (p.includes('E3')?'tag-e3':'tag-e5') + '">' + p + '</span>'; }).join('');
@@ -26057,8 +26094,8 @@ function renderCard(c) {
   } else if(activeTab === 'remediation') {
     tabContent = '<div class="section-label">Implementeringstrin</div><ol class="audit-list" style="margin-top:5px;">'+remItems+'</ol>';
   } else if(activeTab === 'status') {
-    var statusBtns = ['implemented','review','accepted','declined'].map(function(s) {
-      var sl = {implemented:'Implemented',review:'Under review',accepted:'Accepted',declined:'Declined'};
+    var statusBtns = ['implemented','review','accepted','option','declined'].map(function(s) {
+      var sl = {implemented:'Implemented',review:'Under review',accepted:'Accepted',option:'Tilvalg',declined:'Declined'};
       return '<button class="status-btn'+(a.status===s?' sel-'+s:'')+'" onclick="setStatus(\''+spId+'\',\''+s+'\')">'+sl[s]+'</button>';
     }).join('');
     tabContent = '<div class="status-actions"><span class="status-actions-label">Status</span>'+statusBtns+'<span class="save-dot" id="dot-'+spId+'"></span></div><div class="section-label" style="margin-top:10px;">Kommentar</div><textarea class="comment-field" placeholder="Noter..." id="cmt-'+spId+'" oninput="autoGrowComment(this)" onchange="setComment(\''+spId+'\',this.value)">'+(a.comment||'')+'</textarea>';
@@ -26186,7 +26223,7 @@ const REPORT_LABELS = {
     secureScore: 'SECURE SCORE', assessed: 'vurderet', notes: 'Noter', nextSteps: 'Næste skridt',
     licenseSection: 'Licensvurdering',
     area: 'OMRÅDE', control: 'CIS KONTROL', risk: 'RISK', impact: 'IMPACT',
-    discussedWith: 'DISKUTERET MED', statusLabels: { implemented:'Implementeret', accepted:'Accepteret', review:'Under review', declined:'Afvist', none:'Ikke vurderet' },
+    discussedWith: 'DISKUTERET MED', statusLabels: { implemented:'Implementeret', accepted:'Accepteret', option:'Tilvalg', review:'Under review', declined:'Afvist', none:'Ikke vurderet' },
     continued: '(fortsat)', noComment: 'Ingen kommentarer endnu.', noDescription: 'Ingen beskrivelse tilgængelig.', noLicense: 'Ingen licensvurdering angivet.',
     toc: 'Indholdsfortegnelse',
     secOverview: 'Overview', secScope: 'Scope', secMethodology: 'Methodology', secAreas: 'Areas for Improvement',
@@ -26210,7 +26247,7 @@ const REPORT_LABELS = {
     secureScore: 'SECURE SCORE', assessed: 'assessed', notes: 'Notes', nextSteps: 'Next steps',
     licenseSection: 'License Assessment',
     area: 'AREA', control: 'CIS CONTROL', risk: 'RISK', impact: 'IMPACT',
-    discussedWith: 'DISCUSSED WITH', statusLabels: { implemented:'Implemented', accepted:'Accepted', review:'Under review', declined:'Declined', none:'Not assessed' },
+    discussedWith: 'DISCUSSED WITH', statusLabels: { implemented:'Implemented', accepted:'Accepted', option:'Optional add-on', review:'Under review', declined:'Declined', none:'Not assessed' },
     continued: '(continued)', noComment: 'No comments yet.', noDescription: 'No description available.', noLicense: 'No license assessment provided.',
     toc: 'Table of Contents',
     secOverview: 'Overview', secScope: 'Scope', secMethodology: 'Methodology', secAreas: 'Areas for Improvement',
@@ -26387,7 +26424,7 @@ async function generateWordReport(score, noteConstraints, noteNext, lang, licens
     const COLOR_PRIMARY = '1D4ED8', COLOR_DARK = '111827', COLOR_GRAY = '6B7280', COLOR_ACCENT = '3B82F6';
     const riskColors = { Critical:'B91C1C', High:'C2410C', Medium:'B45309', Low:'15803D' };
     const impactColors = { High:'4338CA', Medium:'0369A1', Low:'475569' };
-    const statusColors = { implemented:'16A34A', accepted:'2563EB', review:'D97706', declined:'DC2626', none:'9CA3AF' };
+    const statusColors = { implemented:'16A34A', accepted:'2563EB', option:'7C3AED', review:'D97706', declined:'DC2626', none:'9CA3AF' };
     const statusLabels = L.statusLabels;
 
     function txt(text, opts={}) { return new TextRun({ text: text||'', font:'Calibri', size: opts.size||18, color: opts.color||COLOR_DARK, bold: opts.bold||false, italics: opts.italics||false }); }
@@ -26406,7 +26443,7 @@ async function generateWordReport(score, noteConstraints, noteNext, lang, licens
 
     const done = checks.filter(c => { const a=(assessments[c.check_id]||assessments[c.spId]); return a?.status && a.status!=='none'; }).length;
     const pct = checks.length ? Math.round(done/checks.length*100) : 0;
-    const counts = {implemented:0,review:0,accepted:0,declined:0,none:0};
+    const counts = {implemented:0,review:0,accepted:0,option:0,declined:0,none:0};
     checks.forEach(c => { const s = ((assessments[c.check_id]||assessments[c.spId])||{}).status||'none'; counts[s]++; });
 
     const children = [];
@@ -26434,6 +26471,7 @@ async function generateWordReport(score, noteConstraints, noteNext, lang, licens
         txt('\u25CF ',{color:statusColors.accepted,size:16}), txt(`${counts.accepted} ${statusLabels.accepted}    `,{size:16,color:statusColors.accepted,bold:true}),
         txt('\u25CF ',{color:statusColors.review,size:16}), txt(`${counts.review} ${statusLabels.review}    `,{size:16,color:statusColors.review,bold:true}),
         txt('\u25CF ',{color:statusColors.declined,size:16}), txt(`${counts.declined} ${statusLabels.declined}    `,{size:16,color:statusColors.declined,bold:true}),
+        ...(counts.option ? [txt('\u25CF ',{color:statusColors.option,size:16}), txt(`${counts.option} ${statusLabels.option}    `,{size:16,color:statusColors.option,bold:true})] : []),
         txt('\u25CF ',{color:statusColors.none,size:16}), txt(`${counts.none} ${statusLabels.none}`,{size:16,color:statusColors.none,bold:true}),
       ]}),
     ];
@@ -26782,7 +26820,7 @@ async function generatePDFWithMeta(score, noteConstraints, noteNext, lang, licen
     // Summary bar
     doc.setFillColor(248,249,251); doc.rect(0,y-2,pw,24,'F');
     doc.setDrawColor(229,231,235); doc.line(0,y+22,pw,y+22);
-    const counts = {implemented:0,review:0,accepted:0,declined:0,none:0};
+    const counts = {implemented:0,review:0,accepted:0,option:0,declined:0,none:0};
     checks.forEach(c=>{const s=((assessments[c.check_id] || assessments[c.spId]) || {}).status||'none';counts[s]++;});
 
     doc.setFontSize(7.5); doc.setFont('helvetica','bold'); doc.setTextColor(107,114,128);
@@ -26803,7 +26841,7 @@ async function generatePDFWithMeta(score, noteConstraints, noteNext, lang, licen
       doc.setFillColor(...scC); doc.rect(ml+42,y+13.5,45*(sc/100),2,'F');
     }
 
-    const pills=[{l:`${counts.implemented}  ${L.statusLabels.implemented}`,c:[22,163,74]},{l:`${counts.accepted}  ${L.statusLabels.accepted}`,c:[37,99,235]},{l:`${counts.review}  ${L.statusLabels.review}`,c:[217,119,6]},{l:`${counts.declined}  ${L.statusLabels.declined}`,c:[220,38,38]},{l:`${counts.none}  ${L.statusLabels.none}`,c:[156,163,175]}];
+    const pills=[{l:`${counts.implemented}  ${L.statusLabels.implemented}`,c:[22,163,74]},{l:`${counts.accepted}  ${L.statusLabels.accepted}`,c:[37,99,235]},{l:`${counts.review}  ${L.statusLabels.review}`,c:[217,119,6]},{l:`${counts.declined}  ${L.statusLabels.declined}`,c:[220,38,38]},...(counts.option ? [{l:`${counts.option}  ${L.statusLabels.option}`,c:[124,58,237]}] : []),{l:`${counts.none}  ${L.statusLabels.none}`,c:[156,163,175]}];
     let px=ml+92;
     doc.setFontSize(6.5); doc.setFont('helvetica','bold'); doc.setTextColor(107,114,128);
     doc.text(lang==='en'?'BREAKDOWN':'FORDELING', px, y+2);
@@ -27025,7 +27063,7 @@ async function generatePDFWithMeta(score, noteConstraints, noteNext, lang, licen
     }
     drawTableHeader();
 
-    const statusColors={implemented:[22,163,74],accepted:[37,99,235],review:[217,119,6],declined:[220,38,38],none:[156,163,175]};
+    const statusColors={implemented:[22,163,74],accepted:[37,99,235],option:[124,58,237],review:[217,119,6],declined:[220,38,38],none:[156,163,175]};
     const statusLabels=L.statusLabels;
     const riskColors={Critical:[185,28,28],High:[194,65,12],Medium:[180,83,9],Low:[21,128,61]};
     const riskBg={Critical:[254,242,242],High:[255,247,237],Medium:[255,251,235],Low:[240,253,244]};
