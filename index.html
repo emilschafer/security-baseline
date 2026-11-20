@@ -804,6 +804,7 @@ tbody tr:hover td { background: var(--bg); }
 .nd-dot { display:inline-block; width:10px; height:10px; border-radius:50%; flex:none; }
 .nd-p { background:#ede9fe; color:#5b21b6; } .nd-dot-p { background:#7c3aed; } .nd-sp { background:#7c3aed; }
 .s-option { background:#f5f3ff; color:#6d28d9; border:1px solid #ddd6fe; }
+.status-btn.sel-none { background:#f3f4f6; color:#4b5563; border-color:#d1d5db; }
 .status-btn.sel-option { background:#f5f3ff; color:#6d28d9; border-color:#ddd6fe; }
 .nd-dot-g { background:#1f8a57; } .nd-dot-o { background:#e07a10; } .nd-dot-r { background:#c8281b; } .nd-dot-b { background:#2a6fe0; } .nd-dot-n { background:#98a1b0; }
 .nd-bar { display:flex; height:10px; border-radius:99px; overflow:hidden; background:#e8eaef; }
@@ -24170,7 +24171,7 @@ function missingReviewScopes(tok) {
 }
 
 async function doReviewLogin() {
-  const APP_BUILD = 'Build 2026-11-20 h (SMB-omfang + Exchange consent)';
+  const APP_BUILD = 'Build 2026-11-20 j (CA-politikker + Ikke vurderet)';
   console.log('Security Baseline Tracker', APP_BUILD);
   try { logReview('BUILD', 'implemented', APP_BUILD); } catch (e) {}
   try {
@@ -24796,10 +24797,9 @@ async function runAutomatedReview() {
 
       // ── Section 5: Microsoft Entra ─────────────────────────────────────
       else if (c.check_id === '5.1.2.1') {
-        // Per-user MFA should be disabled (CA should be used instead)
-        const caEnabled = (await callReviewGraph('/identity/conditionalAccess/policies?$select=id,state')).value?.some(p => p.state === 'enabled');
-        pass = caEnabled === true;
-        detail = caEnabled ? 'Conditional Access politikker er aktiveret (per-user MFA bør være deaktiveret)' : 'Ingen aktive CA politikker - per-user MFA check påkrævet';
+        // Per-user MFA kan ikke aflæses via Conditional Access – vurderes manuelt
+        pass = null;
+        detail = 'Per-user MFA kan ikke vurderes automatisk – tjek i Entra → Per-user MFA';
       }
       else if (c.check_id === '5.1.2.2') {
         const allowed = authPolicy?.defaultUserRolePermissions?.allowedToCreateApps;
@@ -24945,29 +24945,41 @@ async function runAutomatedReview() {
           detail = 'Cloud-only tenant - password hash sync ikke relevant';
         }
       }
-      else if (c.check_id === '5.2.2.1') {
-        const caPolicies = await callReviewGraph('/identity/conditionalAccess/policies');
-        const mfaAdminPolicy = caPolicies?.value?.find(p => 
-          p.state === 'enabled' && 
-          (p.displayName?.toLowerCase().includes('mfa') || p.displayName?.toLowerCase().includes('admin'))
-        );
-        pass = mfaAdminPolicy !== null && mfaAdminPolicy !== undefined;
-        detail = pass ? `MFA for admin CA policy fundet: "${mfaAdminPolicy?.displayName}"` : 'Ingen MFA CA policy for admins fundet';
-      }
-      else if (c.check_id === '5.2.2.2') {
-        const caPolicies = await callReviewGraph('/identity/conditionalAccess/policies');
-        const mfaAllPolicy = caPolicies?.value?.find(p => 
-          p.state === 'enabled' && 
-          (p.displayName?.toLowerCase().includes('mfa') || p.displayName?.toLowerCase().includes('all users'))
-        );
-        pass = mfaAllPolicy !== null && mfaAllPolicy !== undefined;
-        detail = pass ? `MFA for alle brugere CA policy: "${mfaAllPolicy?.displayName}"` : 'Ingen MFA CA policy for alle brugere';
-      }
-      else if (c.check_id.startsWith('5.2.2.')) {
-        const caPolicies = await callReviewGraph('/identity/conditionalAccess/policies');
-        const enabled = caPolicies?.value?.filter(p => p.state === 'enabled') || [];
-        pass = enabled.length > 0;
-        detail = `${enabled.length} aktive CA politikker - verificer specifik policy manuelt`;
+      else if (/^5\.2\.2\.\d+$/.test(c.check_id)) {
+        // Conditional Access: vurderer de faktiske politikker (aktive, ikke report-only). Ingen match → status røres ikke, kun en note.
+        const caRes = await callReviewGraph('/identity/conditionalAccess/policies').catch(() => null);
+        if (!caRes || !Array.isArray(caRes.value)) {
+          pass = null; detail = 'Conditional Access-politikker kunne ikke læses – vurder manuelt';
+        } else {
+          const en = caRes.value.filter(p => p.state === 'enabled');
+          const U = p => p.conditions?.users || {}, G = p => p.grantControls?.builtInControls || [], S = p => p.sessionControls || {};
+          const allUsers = p => (U(p).includeUsers || []).includes('All');
+          const admins = p => (U(p).includeRoles || []).length > 0 || allUsers(p);
+          const allApps = p => (p.conditions?.applications?.includeApplications || []).includes('All');
+          const mfa = p => G(p).includes('mfa') || !!p.grantControls?.authenticationStrength;
+          const block = p => G(p).includes('block');
+          const device = p => G(p).includes('compliantDevice') || G(p).includes('domainJoinedDevice');
+          const rules = {
+            '5.2.2.1': p => mfa(p) && admins(p),
+            '5.2.2.2': p => mfa(p) && allUsers(p) && allApps(p),
+            '5.2.2.4': p => admins(p) && S(p).signInFrequency?.isEnabled && S(p).persistentBrowser?.isEnabled && S(p).persistentBrowser?.mode === 'never',
+            '5.2.2.5': p => admins(p) && p.grantControls?.authenticationStrength && (/0004$/.test(p.grantControls.authenticationStrength.id || '') || /phishing/i.test(p.grantControls.authenticationStrength.displayName || '')),
+            '5.2.2.8': p => (p.conditions?.signInRiskLevels || []).includes('high') && (p.conditions?.signInRiskLevels || []).includes('medium') && block(p),
+            '5.2.2.9': p => allUsers(p) && device(p),
+            '5.2.2.10': p => (p.conditions?.applications?.includeUserActions || []).includes('urn:user:registersecurityinfo') && device(p),
+            '5.2.2.11': p => (p.conditions?.applications?.includeApplications || []).includes('d4ebce55-015a-419b-a3c2-5eb8a7fa7e0b') && S(p).signInFrequency?.frequencyInterval === 'everyTime',
+            '5.2.2.12': p => (p.conditions?.authenticationFlows?.transferMethods || '').includes('deviceCodeFlow') && block(p),
+            '5.2.2.17': p => (p.conditions?.authenticationFlows?.transferMethods || '').includes('authenticationTransfer') && block(p)
+          };
+          const rule = rules[c.check_id];
+          if (!rule) {
+            pass = null; detail = en.length + ' aktive CA-politikker – denne kontrol kan ikke vurderes automatisk, vurder manuelt';
+          } else {
+            const hit = en.filter(p => { try { return rule(p); } catch (e) { return false; } });
+            if (hit.length) { pass = true; detail = 'Politik fundet: ' + hit.slice(0, 3).map(p => '"' + p.displayName + '"').join(', '); }
+            else { pass = null; detail = 'Kunden har ikke en aktiv Conditional Access-politik, der kan genkendes automatisk for denne kontrol – vurder manuelt.'; }
+          }
+        }
       }
       else if (c.check_id === '5.2.3.1') {
         const authMethods = await callReviewGraph('/policies/authenticationMethodsPolicy');
@@ -26064,14 +26076,142 @@ function openCustomer(spId) {
 
 function setDetailTab(t) { detailTab = t; renderCustomerDetail(); }
 
+
+// ───────── Kunderapporter: Sikkerhedstjek (review) og Implementeringsrapport (SMB) ─────────
+const SR_TXT = {
+  da: { review:'Sikkerhedstjek', impl:'Implementeringsrapport – Premium SMB', customer:'Kunde', date:'Dato', basis:'Grundlag: CIS Microsoft 365 Foundations Benchmark v7.0.0',
+    summary:'Samlet overblik', ok:'I orden', open:'Skal håndteres', notAssessed:'Ikke vurderet', areas:'Status pr. område', area:'Område', light:'Status', okOf:'I orden', first:'Vigtigste ting at tage fat på først',
+    firstNone:'Ingen åbne punkter med høj risiko – godt gået.', control:'Kontrol', risk:'Risiko', why:'Hvorfor det er vigtigt', note:'Note', green:'Grøn', amber:'Gul', red:'Rød', grey:'Ikke vurderet',
+    foot:'Rapporten er et øjebliksbillede og vurderer indstillinger i kundens Microsoft 365-miljø.',
+    implIntro:'Denne rapport beskriver i almindeligt sprog, hvad vi har sat op for at beskytte jeres Microsoft 365-miljø, hvad I som brugere kan opleve, og hvad vi har aftalt.',
+    done:'Det vi har sat op', doneNone:'Ingen kontroller er markeret som implementeret endnu.', users:'Det kan I som brugere opleve', usersIntro:'Disse indstillinger kan ændre den daglige arbejdsgang. Spørg os, hvis noget virker uventet:',
+    usersNone:'Ingen af de implementerede indstillinger forventes at give mærkbare ændringer for brugerne.', agreed:'Det vi har aftalt', agreedIntro:'Punkter hvor vi sammen har valgt at acceptere en afvigelse eller et tilvalg:', agreedNone:'Ingen aftalte afvigelser eller tilvalg.',
+    next:'Det der mangler / næste skridt', nextNone:'Der er ingen åbne punkter.', pts:'kontroller' },
+  en: { review:'Security Check', impl:'Implementation Report – Premium SMB', customer:'Customer', date:'Date', basis:'Basis: CIS Microsoft 365 Foundations Benchmark v7.0.0',
+    summary:'Overall summary', ok:'In order', open:'Needs attention', notAssessed:'Not assessed', areas:'Status by area', area:'Area', light:'Status', okOf:'In order', first:'Most important items to address first',
+    firstNone:'No open high-risk items – well done.', control:'Control', risk:'Risk', why:'Why it matters', note:'Note', green:'Green', amber:'Amber', red:'Red', grey:'Not assessed',
+    foot:'This report is a snapshot and evaluates settings in the customer\'s Microsoft 365 environment.',
+    implIntro:'This report describes in plain language what we have configured to protect your Microsoft 365 environment, what you may notice as a user, and what we have agreed.',
+    done:'What we have set up', doneNone:'No controls are marked as implemented yet.', users:'What you may notice as a user', usersIntro:'These settings can change daily workflows. Contact us if something looks unexpected:',
+    usersNone:'None of the implemented settings are expected to cause noticeable changes for users.', agreed:'What we have agreed', agreedIntro:'Items where we have jointly chosen to accept a deviation or an option:', agreedNone:'No agreed deviations or options.',
+    next:'What is missing / next steps', nextNone:'There are no open items.', pts:'controls' }
+};
+function srStatusOf(id) { return ((assessments[id] || {}).status) || 'none'; }
+function srNoteOf(id) { return ((assessments[id] || {}).comment) || ''; }
+const SR_RISK_RANK = { Critical: 0, High: 1, Medium: 2, Low: 3 };
+
+function buildSimpleReportHtml(c, kind, lang) {
+  const T = SR_TXT[lang] || SR_TXT.da;
+  const list = scopedChecks(c);
+  const dateStr = new Date().toLocaleDateString(lang === 'en' ? 'en-GB' : 'da-DK', { day: '2-digit', month: 'long', year: 'numeric' });
+  const isOk = s => s === 'implemented' || s === 'accepted' || s === 'option';
+  const cnt = { ok: 0, open: 0, none: 0 };
+  list.forEach(x => { const s = srStatusOf(x.check_id); if (isOk(s)) cnt.ok++; else if (s === 'none') cnt.none++; else cnt.open++; });
+  const dot = col => `<span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:${col};vertical-align:middle;"></span>`;
+  const COL = { green: '#16A34A', amber: '#D97706', red: '#DC2626', grey: '#9CA3AF' };
+  const sections = [...new Set(list.map(x => x.section))];
+  const css = `body{font-family:Calibri,Arial,sans-serif;color:#111827;font-size:11pt;margin:0;padding:24px;}h1{margin:0 0 4px;font-size:24pt;color:#fff;}h2{font-size:15pt;color:#1D4ED8;margin:22px 0 8px;border-bottom:1px solid #DBEAFE;padding-bottom:4px;}
+  .hd{background:#1D4ED8;color:#DBEAFE;padding:18px 22px;border-radius:6px;}table{border-collapse:collapse;width:100%;margin:6px 0;}th{background:#EFF6FF;text-align:left;font-size:9.5pt;color:#374151;}td,th{border:1px solid #E5E7EB;padding:6px 8px;vertical-align:top;font-size:10pt;}
+  .kpi td{border:none;text-align:center;font-size:10pt;background:#F9FAFB;padding:12px;}.kpi b{display:block;font-size:20pt;}ul{margin:4px 0 4px 18px;padding:0;}li{margin:3px 0;}.mu{color:#6B7280;font-size:9.5pt;}.ft{margin-top:28px;color:#6B7280;font-size:9pt;border-top:1px solid #E5E7EB;padding-top:8px;}@media print{body{padding:0;}h2{page-break-after:avoid;}tr{page-break-inside:avoid;}}`;
+  let h = `<div class="hd"><h1>${escH(kind === 'review' ? T.review : T.impl)}</h1><div>${T.customer}: ${escH(c.name)} &nbsp;·&nbsp; ${T.date}: ${dateStr}</div><div style="font-size:9.5pt;">${T.basis}</div></div>`;
+
+  if (kind === 'review') {
+    h += `<h2>${T.summary}</h2><table class="kpi"><tr><td><b style="color:${COL.green}">${cnt.ok}</b>${T.ok}</td><td><b style="color:${COL.red}">${cnt.open}</b>${T.open}</td><td><b style="color:${COL.grey}">${cnt.none}</b>${T.notAssessed}</td></tr></table>`;
+    h += `<h2>${T.areas}</h2><table><tr><th>${T.area}</th><th style="width:70px">${T.light}</th><th style="width:90px">${T.okOf}</th></tr>`;
+    sections.forEach(sec => {
+      const sc = list.filter(x => x.section === sec);
+      const ok = sc.filter(x => isOk(srStatusOf(x.check_id))).length;
+      const none = sc.filter(x => srStatusOf(x.check_id) === 'none').length;
+      const crit = sc.filter(x => srStatusOf(x.check_id) === 'declined' && (x.risk_level === 'Critical' || x.risk_level === 'High')).length;
+      let col = 'green';
+      if (none === sc.length) col = 'grey'; else if (crit > 0 || ok / sc.length < 0.5) col = 'red'; else if (ok < sc.length) col = 'amber';
+      h += `<tr><td>${escH(sec)}</td><td>${dot(COL[col])} ${T[col]}</td><td>${ok} / ${sc.length}</td></tr>`;
+    });
+    h += '</table>';
+    const first = list.filter(x => { const s = srStatusOf(x.check_id); return s === 'declined' || s === 'review'; })
+      .sort((a, b) => (SR_RISK_RANK[a.risk_level] ?? 9) - (SR_RISK_RANK[b.risk_level] ?? 9)).slice(0, 10);
+    h += `<h2>${T.first}</h2>`;
+    if (!first.length) h += `<p>${T.firstNone}</p>`;
+    else {
+      h += `<table><tr><th style="width:55px">ID</th><th>${T.control}</th><th style="width:70px">${T.risk}</th><th>${T.why}</th></tr>`;
+      first.forEach(x => { h += `<tr><td>${escH(x.check_id)}</td><td>${escH(x.title)}</td><td>${escH(x.risk_level || '')}</td><td>${escH(x.rationale_short || '')}</td></tr>`; });
+      h += '</table>';
+    }
+    const notes = list.filter(x => srStatusOf(x.check_id) === 'none' && srNoteOf(x.check_id));
+    if (notes.length) {
+      h += `<h2>${T.note}</h2><ul>`;
+      notes.forEach(x => { h += `<li><b>${escH(x.check_id)}</b> ${escH(x.title)}<br><span class="mu">${escH(srNoteOf(x.check_id))}</span></li>`; });
+      h += '</ul>';
+    }
+  } else {
+    h += `<p>${T.implIntro}</p>`;
+    const impl = list.filter(x => srStatusOf(x.check_id) === 'implemented');
+    h += `<h2>${T.done} (${impl.length} ${T.pts})</h2>`;
+    if (!impl.length) h += `<p>${T.doneNone}</p>`;
+    sections.forEach(sec => {
+      const sc = impl.filter(x => x.section === sec);
+      if (!sc.length) return;
+      h += `<p style="margin:10px 0 2px;"><b>${escH(sec)}</b></p><ul>` + sc.map(x => `<li>${escH(x.title)}</li>`).join('') + '</ul>';
+    });
+    const felt = impl.filter(x => x.impact_level === 'High');
+    h += `<h2>${T.users}</h2>`;
+    if (!felt.length) h += `<p>${T.usersNone}</p>`;
+    else {
+      h += `<p>${T.usersIntro}</p><ul>` + felt.map(x => `<li>${escH(x.title)}` + (lang === 'en' && x.impact_short ? `<br><span class="mu">${escH(x.impact_short.slice(0, 220))}</span>` : '') + '</li>').join('') + '</ul>';
+    }
+    const agreed = list.filter(x => { const s = srStatusOf(x.check_id); return s === 'accepted' || s === 'option'; });
+    h += `<h2>${T.agreed}</h2>`;
+    if (!agreed.length) h += `<p>${T.agreedNone}</p>`;
+    else {
+      h += `<p>${T.agreedIntro}</p><ul>` + agreed.map(x => `<li>${escH(x.title)}` + (srNoteOf(x.check_id) ? `<br><span class="mu">${escH(srNoteOf(x.check_id))}</span>` : '') + '</li>').join('') + '</ul>';
+    }
+    const miss = list.filter(x => { const s = srStatusOf(x.check_id); return s === 'declined' || s === 'review'; })
+      .sort((a, b) => (SR_RISK_RANK[a.risk_level] ?? 9) - (SR_RISK_RANK[b.risk_level] ?? 9));
+    h += `<h2>${T.next}</h2>`;
+    if (!miss.length) h += `<p>${T.nextNone}</p>`;
+    else h += '<ul>' + miss.map(x => `<li>${escH(x.title)}</li>`).join('') + '</ul>';
+  }
+  h += `<div class="ft">${T.foot}</div>`;
+  return { css, body: h, title: (kind === 'review' ? T.review : T.impl) + ' – ' + c.name };
+}
+
+function exportSimpleReport(spId, kind, fmt) {
+  const c = customers.find(x => x.spId === spId);
+  if (!c) return;
+  const sel = document.getElementById('sr-lang-' + kind + '-' + spId);
+  const lang = sel ? sel.value : 'da';
+  try {
+    const r = buildSimpleReportHtml(c, kind, lang);
+    const safe = (r.title || 'rapport').replace(/[^\wæøåÆØÅ\- ]+/g, '').trim().replace(/\s+/g, '_');
+    if (fmt === 'word') {
+      const doc = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"><title>${escH(r.title)}</title><style>${r.css}</style></head><body>${r.body}</body></html>`;
+      const blob = new Blob(['﻿', doc], { type: 'application/msword' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob); a.download = safe + '.doc';
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+      showToast('Word-dokument hentet', 'success');
+    } else {
+      const w = window.open('', '_blank');
+      if (!w) { showToast('Pop-up blev blokeret – tillad pop-ups for siden og prøv igen', 'error'); return; }
+      w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${escH(r.title)}</title><style>${r.css}</style></head><body>${r.body}</body></html>`);
+      w.document.close(); w.focus();
+      setTimeout(() => { try { w.print(); } catch (e) {} }, 500);
+      showToast('Vælg "Gem som PDF" i udskriftsvinduet', 'success');
+    }
+  } catch (e) { showToast('Kunne ikke lave rapporten: ' + e.message, 'error'); }
+}
+function simpleReportActions(id, kind) {
+  return `<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:6px;"><select id="sr-lang-${kind}-${id}" class="btn btn-sm" style="padding:6px 8px;"><option value="da">Dansk</option><option value="en">English</option></select><button class="btn btn-primary btn-sm" onclick="exportSimpleReport('${id}','${kind}','word')">Hent Word</button><button class="btn btn-sm btn-success" onclick="exportSimpleReport('${id}','${kind}','pdf')">Hent PDF</button></div>`;
+}
+
 function reportCardsHtml(c) {
   const lvl = customerLevel(c), id = escH(c.spId);
   const actions = `<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:6px;"><button class="btn btn-primary btn-sm" onclick="openExportFor('${id}')">Eksportér (Word/PDF · dansk/engelsk)</button><button class="btn btn-sm btn-success" onclick="latestReportFor('${id}')">Seneste gemte rapport</button></div>`;
-  const soon = '<div class="nd-muted" style="margin-top:6px;">Under udvikling – ikke tilgængelig endnu</div>';
   const card = (name, who, cls, desc, body) => `<div class="nd-card" style="display:flex;flex-direction:column;gap:10px;"><strong style="font-size:15px;">${name}</strong><span class="nd-chip ${cls}" style="align-self:flex-start;">${who}</span><div class="nd-muted" style="line-height:1.5;">${desc}</div>${body}</div>`;
-  let h = card('Sikkerhedstjek (review-rapport)', 'Alle kunder', 'nd-n', 'Let læselig oversigt med trafiklys pr. område og de vigtigste ting at tage fat på først.', soon);
+  let h = card('Sikkerhedstjek (review-rapport)', 'Alle kunder', 'nd-n', 'Let læselig oversigt med trafiklys pr. område og de vigtigste ting at tage fat på først.', simpleReportActions(id, 'review'));
   if (lvl === 'SMB') {
-    h += card('Implementeringsrapport – Premium SMB', 'Premium SMB', 'nd-smb', 'Kort og ikke teknisk: det vi har sat op, hvad brugerne kan opleve, og hvad vi har aftalt.', soon);
+    h += card('Implementeringsrapport – Premium SMB', 'Premium SMB', 'nd-smb', 'Kort og ikke teknisk: det vi har sat op, hvad brugerne kan opleve, og hvad vi har aftalt.', simpleReportActions(id, 'impl'));
     h += card('Detaljeret rapport (teknisk)', 'Premium SMB', 'nd-smb', 'Den nuværende detaljerede rapport, begrænset til de ' + SMB_CHECK_IDS.size + ' kontroller i Premium SMB.', actions);
   } else {
     h += card('Implementeringsrapport – Premium Enterprise', 'Premium Enterprise', 'nd-ent', 'Den detaljerede rapport med status, risiko og noter for alle kontroller.', actions);
@@ -26255,8 +26395,8 @@ function renderCard(c) {
   } else if(activeTab === 'remediation') {
     tabContent = '<div class="section-label">Implementeringstrin</div><ol class="audit-list" style="margin-top:5px;">'+remItems+'</ol>';
   } else if(activeTab === 'status') {
-    var statusBtns = ['implemented','review','accepted','option','declined'].map(function(s) {
-      var sl = {implemented:'Implemented',review:'Under review',accepted:'Accepted',option:'Tilvalg',declined:'Declined'};
+    var statusBtns = ['implemented','review','accepted','option','declined','none'].map(function(s) {
+      var sl = {implemented:'Implemented',review:'Under review',accepted:'Accepted',option:'Tilvalg',declined:'Declined',none:'Ikke vurderet'};
       return '<button class="status-btn'+(a.status===s?' sel-'+s:'')+'" onclick="setStatus(\''+spId+'\',\''+s+'\')">'+sl[s]+'</button>';
     }).join('');
     tabContent = '<div class="status-actions"><span class="status-actions-label">Status</span>'+statusBtns+'<span class="save-dot" id="dot-'+spId+'"></span></div><div class="section-label" style="margin-top:10px;">Kommentar</div><textarea class="comment-field" placeholder="Noter..." id="cmt-'+spId+'" oninput="autoGrowComment(this)" onchange="setComment(\''+spId+'\',this.value)">'+(a.comment||'')+'</textarea>';
