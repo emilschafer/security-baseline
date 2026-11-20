@@ -24171,7 +24171,7 @@ function missingReviewScopes(tok) {
 }
 
 async function doReviewLogin() {
-  const APP_BUILD = 'Build 2026-11-20 k (flere automatiske kontroller)';
+  const APP_BUILD = 'Build 2026-11-20 m (noter ved fejl)';
   console.log('Security Baseline Tracker', APP_BUILD);
   try { logReview('BUILD', 'implemented', APP_BUILD); } catch (e) {}
   try {
@@ -24987,7 +24987,7 @@ async function runAutomatedReview() {
         detail = pass ? 'Microsoft Authenticator number matching aktiveret' : 'Verificer Authenticator indstillinger';
       }
       else if (c.check_id === '5.2.3.2') {
-        const st = await callReviewGraph('/settings').catch(() => null);
+        const st = await callReviewGraph('/groupSettings').catch(() => null);
         const pr = st?.value?.find(x => x.displayName === 'Password Rule Settings');
         if (st && Array.isArray(st.value)) {
           const v = n => pr?.values?.find(x => x.name === n)?.value;
@@ -25367,7 +25367,7 @@ async function runAutomatedReview() {
       detail = `Fejl: ${err.message}`;
     }
 
-    results[c.check_id] = { pass, detail, noteOnly: pass === null && /^Kunden har ikke /.test(detail || '') };
+    results[c.check_id] = { pass, detail, noteOnly: pass === null && /^(Kunden har ikke |Fejl:|Kunne ikke )/.test(detail || '') };
     logReview(c.check_id, pass === true ? 'implemented' : pass === false ? 'declined' : 'none', detail);
     await new Promise(r => setTimeout(r, 30)); // Small delay to not hit rate limits
   }
