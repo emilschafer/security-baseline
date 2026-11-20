@@ -24171,7 +24171,7 @@ function missingReviewScopes(tok) {
 }
 
 async function doReviewLogin() {
-  const APP_BUILD = 'Build 2026-11-20 m (noter ved fejl)';
+  const APP_BUILD = 'Build 2026-11-20 o (PS-resultater i konsol)';
   console.log('Security Baseline Tracker', APP_BUILD);
   try { logReview('BUILD', 'implemented', APP_BUILD); } catch (e) {}
   try {
@@ -24437,6 +24437,7 @@ async function runAutomatedReview() {
           }
         } catch (se) {}
         console.log(`Azure Function: ${Object.keys(window._psResults).length} PS resultater | diagnose: ` + JSON.stringify(fnDiag || {}));
+        try { console.log('PS-RESULTATER (id | pass | tekst)\n' + Object.entries(window._psResults).sort().map(([k, v]) => k + ' | ' + v.pass + ' | ' + String(v.detail || '').slice(0, 160)).join('\n')); } catch (e) {}
         if (fnDiag) {
           const ok = fnDiag.exo === 'forbundet' && fnDiag.teams === 'forbundet';
           logReview('FUNCTION', ok ? 'implemented' : 'review',
@@ -25367,7 +25368,7 @@ async function runAutomatedReview() {
       detail = `Fejl: ${err.message}`;
     }
 
-    results[c.check_id] = { pass, detail, noteOnly: pass === null && /^(Kunden har ikke |Fejl:|Kunne ikke )/.test(detail || '') };
+    results[c.check_id] = { pass, detail, noteOnly: pass === null && /^(Kunden har ikke |Fejl:|Kunne ikke |Verificer |Denne kontrol|\d+ aktive CA)/.test(detail || '') };
     logReview(c.check_id, pass === true ? 'implemented' : pass === false ? 'declined' : 'none', detail);
     await new Promise(r => setTimeout(r, 30)); // Small delay to not hit rate limits
   }
@@ -26145,7 +26146,7 @@ function buildSimpleReportHtml(c, kind, lang) {
       first.forEach(x => { h += `<tr><td>${escH(x.check_id)}</td><td>${escH(x.title)}</td><td>${escH(x.risk_level || '')}</td><td>${escH(x.rationale_short || '')}</td></tr>`; });
       h += '</table>';
     }
-    const notes = list.filter(x => srStatusOf(x.check_id) === 'none' && srNoteOf(x.check_id));
+    const notes = list.filter(x => srStatusOf(x.check_id) === 'none' && /^Kunden har ikke /.test(srNoteOf(x.check_id)));
     if (notes.length) {
       h += `<h2>${T.note}</h2><ul>`;
       notes.forEach(x => { h += `<li><b>${escH(x.check_id)}</b> ${escH(x.title)}<br><span class="mu">${escH(srNoteOf(x.check_id))}</span></li>`; });
