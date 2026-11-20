@@ -24171,7 +24171,7 @@ function missingReviewScopes(tok) {
 }
 
 async function doReviewLogin() {
-  const APP_BUILD = 'Build 2026-11-20 o (PS-resultater i konsol)';
+  const APP_BUILD = 'Build 2026-11-20 p (venter på Exchange/Teams)';
   console.log('Security Baseline Tracker', APP_BUILD);
   try { logReview('BUILD', 'implemented', APP_BUILD); } catch (e) {}
   try {
@@ -24401,8 +24401,9 @@ async function runAutomatedReview() {
 
   // Call Azure Function for Exchange/Teams checks in parallel
   window._psResults = {};
+  let psPromise = Promise.resolve();
   if (APP_CONFIG.azureFunctionUrl) {
-    (async () => {
+    psPromise = (async () => {
       try {
         // Get EXO token
         let exoToken = null;
@@ -24481,6 +24482,10 @@ async function runAutomatedReview() {
   const gaRoleId = gaRole?.value?.[0]?.id;
   const gaMembers = gaRoleId ? await callReviewGraph(`/directoryRoles/${gaRoleId}/members?$select=id,userPrincipalName,onPremisesSyncEnabled`) : null;
   const gaCount = gaMembers?.value?.length || 0;
+
+  // Vent på Exchange/Teams-resultaterne, før kontrollerne gennemgås (ellers står de som manuelle)
+  try { showToast('Henter Exchange/Teams-resultater – det kan tage op til et minut…'); } catch (e) {}
+  await psPromise;
 
   for (const c of reviewChecks) {
     current++;
