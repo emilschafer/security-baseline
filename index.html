@@ -24170,7 +24170,7 @@ function missingReviewScopes(tok) {
 }
 
 async function doReviewLogin() {
-  const APP_BUILD = 'Build 2026-11-20 b (Exchange/Teams token pr. tjeneste)';
+  const APP_BUILD = 'Build 2026-11-20 f (bevarer noter og status)';
   console.log('Security Baseline Tracker', APP_BUILD);
   try { logReview('BUILD', 'implemented', APP_BUILD); } catch (e) {}
   try {
@@ -24254,7 +24254,12 @@ async function doReviewLogin() {
           window[key] = tok;
           const tsc = tokenScopes(tok);
           console.log(navn + '-token scopes:', tsc ? tsc.join(' ') : '(ukendt)');
-          logReview('TOKEN', 'implemented', navn + '-token hentet. Rettigheder: ' + (tsc ? tsc.join(' ') : 'kunne ikke læses'));
+          if (navn === 'Exchange' && tsc && !tsc.some(x => /^Exchange\.Manage/i.test(x))) {
+            logReview('TOKEN', 'review', 'Exchange-tokenet mangler Exchange.ManageV2 (har kun: ' + tsc.join(' ') + '). Tilføj Office 365 Exchange Online → Delegated → Exchange.ManageV2 i app-registreringen og giv admin consent.');
+            showToast('Exchange-tokenet mangler rettigheden Exchange.ManageV2 – se review-loggen', 'error');
+          } else {
+            logReview('TOKEN', 'implemented', navn + '-token hentet. Rettigheder: ' + (tsc ? tsc.join(' ') : 'kunne ikke læses'));
+          }
         } catch (te) {
           const tm = String(te.errorMessage || te.message || te);
           console.warn(navn + '-token kunne ikke hentes:', tm);
@@ -24406,13 +24411,25 @@ async function runAutomatedReview() {
         const fnDiag = r && r._diag;
         if (r) delete r._diag;
         window._psResults = r || {};
-        console.log(`Azure Function: ${Object.keys(window._psResults).length} PS resultater`, fnDiag || '');
+        try {
+          // Opsummering af Exchange/Teams-resultaterne i review-loggen
+          const ents = Object.entries(window._psResults);
+          const errs = ents.filter(([id, v]) => v && v.pass === null && /^Fejl/i.test(v.detail || ''));
+          const okN = ents.filter(([id, v]) => v && v.pass === true).length;
+          const badN = ents.filter(([id, v]) => v && v.pass === false).length;
+          console.log('Exchange/Teams: ' + ents.length + ' resultater (' + okN + ' i orden, ' + badN + ' ikke, ' + errs.length + ' fejl)');
+          if (errs.length) {
+            console.warn('Exchange/Teams-fejl:', errs.map(([id, v]) => id + ': ' + v.detail).join('\n'));
+            logReview('FUNCTION-FEJL', 'review', errs.length + ' kontroller gav fejl: ' + errs.map(([id, v]) => id + ' → ' + String(v.detail).replace(/^Fejl:\s*/i, '').slice(0, 140)).join(' | ').slice(0, 1800));
+          }
+        } catch (se) {}
+        console.log(`Azure Function: ${Object.keys(window._psResults).length} PS resultater | diagnose: ` + JSON.stringify(fnDiag || {}));
         if (fnDiag) {
           const ok = fnDiag.exo === 'forbundet' && fnDiag.teams === 'forbundet';
           logReview('FUNCTION', ok ? 'implemented' : 'review',
             'Metode: ' + (fnDiag.mode || '?') + ' | Exchange: ' + fnDiag.exo + (fnDiag.exoError ? ' (' + String(fnDiag.exoError).slice(0, 220) + ')' : '') +
             ' | Teams: ' + fnDiag.teams + (fnDiag.teamsError ? ' (' + String(fnDiag.teamsError).slice(0, 220) + ')' : '') +
-            ' | ' + Object.keys(window._psResults).length + ' kontroller returneret');
+            ' | tokens: ' + (fnDiag.tokens || '?') + ' | ' + Object.keys(window._psResults).length + ' kontroller returneret');
         }
       } catch(e) { console.warn('Azure Function fejlede:', e); }
     })();
@@ -25318,7 +25335,7 @@ async function runAutomatedReview() {
       detail = `Fejl: ${err.message}`;
     }
 
-    results[c.check_id] = { pass, detail, noteOnly: pass === null && /^Kunden har ikke (en licens|opsat)/.test(detail || '') };
+    results[c.check_id] = { pass, detail, noteOnly: pass === null && /^Kunden har ikke /.test(detail || '') };
     logReview(c.check_id, pass === true ? 'implemented' : pass === false ? 'declined' : 'none', detail);
     await new Promise(r => setTimeout(r, 30)); // Small delay to not hit rate limits
   }
@@ -25409,8 +25426,12 @@ async function applyReviewResults() {
       continue;
     }
 
-    const status = result.pass ? 'implemented' : 'declined';
     const key = checkId;
+    const prevStatus = assessments[key] && assessments[key].status;
+    const prevComment = (assessments[key] && assessments[key].comment) || '';
+    // Et review må ikke overskrive en bevidst vurdering (Accepteret / Tilvalg) når kontrollen ikke er opfyldt
+    let status = result.pass ? 'implemented' : 'declined';
+    if (!result.pass && (prevStatus === 'accepted' || prevStatus === 'option')) status = prevStatus;
 
     // Update local assessments
     if (!assessments[key]) assessments[key] = { status: 'none', comment: '' };
@@ -25426,6 +25447,8 @@ async function applyReviewResults() {
         Comment: result.detail.slice(0, 200),
         UpdatedBy: currentUser?.email || ''
       };
+      // Har kontrollen allerede en note, skrives den ikke over
+      if (prevComment) delete data.Comment;
 
       if (assessments[key].spId) {
         await updateItem(listIds.assessments, assessments[key].spId, data);
