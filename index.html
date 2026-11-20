@@ -24139,6 +24139,8 @@ function startReview(customerId, customerName) {
   window._currentSecureScore = null;
   window._psResults = {};
   window._graphErrSeen = {};
+  window._needsP2 = false;
+  window._delExoToken = null; window._delTeamsToken = null;
   document.getElementById('review-customer-name').textContent = customerName;
   document.getElementById('review-login-step').style.display = '';
   document.getElementById('review-progress-step').style.display = 'none';
@@ -24180,10 +24182,34 @@ async function doReviewLogin() {
     await reviewMsalInstance.initialize();
 
     // .default scope giver alle tilladte permissions i ét kald
-    let resp = await reviewMsalInstance.loginPopup({
-      scopes: ['https://graph.microsoft.com/.default'],
-      prompt: 'select_account'
-    });
+    // Beder om rettighederne ved navn (ikke .default): så viser Microsoft automatisk samtykkevinduet,
+    // hver gang appen har fået en ny rettighed som kunden endnu ikke har godkendt.
+    const reviewScopeList = REVIEW_REQUIRED_SCOPES.map(x => 'https://graph.microsoft.com/' + x);
+    // Exchange og Teams har egne API'er. De får samtykke i SAMME vindue (extraScopesToConsent),
+    // og tokens til dem hentes bagefter stille med det samme login.
+    const EXO_CONSENT = 'https://outlook.office365.com/Exchange.Manage';
+    const TEAMS_CONSENT = '48ac35b8-9aa8-4d74-927d-1f4a14a0b239/user_impersonation';
+    const isScopeErr = (e) => /AADSTS650053|AADSTS70011|AADSTS650052|AADSTS500011|invalid_scope/i.test(String(e.errorMessage || e.message || e));
+    let resp;
+    let extrasOk = true;
+    try {
+      resp = await reviewMsalInstance.loginPopup({ scopes: reviewScopeList, extraScopesToConsent: [EXO_CONSENT, TEAMS_CONSENT], prompt: 'select_account' });
+    } catch (e0) {
+      if (!isScopeErr(e0)) throw e0;
+      extrasOk = false;
+      console.warn('Exchange/Teams-rettigheder mangler i app-registreringen:', e0.errorMessage || e0.message);
+      showToast('Exchange/Teams-rettigheder mangler i app-registreringen, så de kontroller springes over: ' + String(e0.errorMessage || e0.message).slice(0, 200), 'error');
+      try {
+        resp = await reviewMsalInstance.loginPopup({ scopes: reviewScopeList, prompt: 'select_account' });
+      } catch (e1) {
+        if (isScopeErr(e1)) {
+          showToast('Appen mangler en rettighed i app-registreringen: ' + String(e1.errorMessage || e1.message).slice(0, 300), 'error');
+          console.error('Review login scope-fejl:', e1.errorMessage || e1.message);
+          return;
+        }
+        throw e1;
+      }
+    }
 
     // Tjek hvilke rettigheder kundens tenant faktisk har godkendt, og bed om samtykke hvis noget mangler
     let missing = missingReviewScopes(resp.accessToken);
@@ -24192,6 +24218,7 @@ async function doReviewLogin() {
       if (ok) {
         resp = await reviewMsalInstance.loginPopup({
           scopes: ['https://graph.microsoft.com/.default'],
+          extraScopesToConsent: extrasOk ? [EXO_CONSENT, TEAMS_CONSENT] : [],
           prompt: 'consent',
           account: resp.account
         });
@@ -24214,6 +24241,23 @@ async function doReviewLogin() {
     } catch (e) {}
 
     reviewMsalInstance.setActiveAccount(resp.account);
+    window._delExoToken = null; window._delTeamsToken = null;
+    window._reviewUpn = resp.account.username || '';
+    if (extrasOk) {
+      const wanted = [['Exchange', 'https://outlook.office365.com/.default', '_delExoToken'], ['Teams', '48ac35b8-9aa8-4d74-927d-1f4a14a0b239/.default', '_delTeamsToken']];
+      for (const [navn, sc, key] of wanted) {
+        try {
+          const tr = await reviewMsalInstance.acquireTokenSilent({ scopes: [sc], account: resp.account });
+          window[key] = tr.accessToken;
+          const tsc = tokenScopes(tr.accessToken);
+          console.log(navn + '-token scopes:', tsc ? tsc.join(' ') : '(ukendt)');
+        } catch (te) {
+          const tm = String(te.errorMessage || te.message || te);
+          console.warn(navn + '-token kunne ikke hentes:', tm);
+          logReview('TOKEN', 'review', navn + '-token kunne ikke hentes: ' + tm.slice(0, 220));
+        }
+      }
+    }
     reviewToken = resp.accessToken;
     reviewTenantId = resp.account.tenantId;
     console.log('Review token tenant:', reviewTenantId);
@@ -24266,7 +24310,9 @@ async function reportGraphError(r, endpoint) {
     const key = r.status + '|' + code + '|' + msg;
     const path = endpoint.split('?')[0];
     console.warn('Graph ' + r.status + ' ' + path + ' → ' + code + ': ' + msg + (www ? ' | ' + www : ''));
+    if (code === 'AadPremiumLicenseRequired' || /does not have access to any of the reviews/i.test(msg)) window._needsP2 = true;
     if (r.status === 404 || r.status === 401) return;
+    if (window._needsP2 && (code === 'AadPremiumLicenseRequired' || /does not have access to any of the reviews/i.test(msg))) return;
     const seen = window._graphErrSeen;
     if (!seen[key]) { seen[key] = []; }
     seen[key].push(path);
@@ -24299,15 +24345,23 @@ async function callAzureFunction(exoToken, teamsToken) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         accessToken: reviewToken,
-        exoToken: exoToken || reviewToken,
-        teamsToken: teamsToken || reviewToken,
-        tenantId: reviewTenantId
+        exoToken: exoToken || '',
+        teamsToken: teamsToken || '',
+        userPrincipalName: window._reviewUpn || '',
+        tenantId: reviewTenantId,
+        tenantDomain: window._tenantDomain || ''
       })
     });
-    if (!r.ok) return {};
+    if (!r.ok) {
+      let t = ''; try { t = (await r.text()).slice(0, 200); } catch (e) {}
+      console.warn('Azure Function svarede ' + r.status + ': ' + t);
+      logReview('FUNCTION', 'review', 'Azure Function svarede ' + r.status + (t ? ': ' + t : ''));
+      return {};
+    }
     return r.json();
   } catch(e) {
     console.warn('Azure Function fejl:', e);
+    logReview('FUNCTION', 'review', 'Azure Function kunne ikke kontaktes: ' + (e.message || e));
     return {};
   }
 }
@@ -24337,9 +24391,23 @@ async function runAutomatedReview() {
           exoToken = exoResp.accessToken;
         } catch(e) { console.warn('EXO token fejl:', e.message); }
 
-        const r = await callAzureFunction(null, null);
+        // Kundens .onmicrosoft.com-domæne bruges til Exchange-forbindelsen
+        try {
+          const orgInfo = await callReviewGraph('/organization?$select=verifiedDomains');
+          window._tenantDomain = (orgInfo?.value?.[0]?.verifiedDomains || []).find(d => d.isInitial)?.name || '';
+        } catch (e) {}
+        const r = await callAzureFunction(window._delExoToken, window._delTeamsToken);
+        const fnDiag = r && r._diag;
+        if (r) delete r._diag;
         window._psResults = r || {};
-        console.log(`Azure Function: ${Object.keys(window._psResults).length} PS resultater`);
+        console.log(`Azure Function: ${Object.keys(window._psResults).length} PS resultater`, fnDiag || '');
+        if (fnDiag) {
+          const ok = fnDiag.exo === 'forbundet' && fnDiag.teams === 'forbundet';
+          logReview('FUNCTION', ok ? 'implemented' : 'review',
+            'Metode: ' + (fnDiag.mode || '?') + ' | Exchange: ' + fnDiag.exo + (fnDiag.exoError ? ' (' + String(fnDiag.exoError).slice(0, 220) + ')' : '') +
+            ' | Teams: ' + fnDiag.teams + (fnDiag.teamsError ? ' (' + String(fnDiag.teamsError).slice(0, 220) + ')' : '') +
+            ' | ' + Object.keys(window._psResults).length + ' kontroller returneret');
+        }
       } catch(e) { console.warn('Azure Function fejlede:', e); }
     })();
   }
@@ -24720,8 +24788,13 @@ async function runAutomatedReview() {
         const orgId = orgResp?.value?.[0]?.id;
         return orgId ? callReviewGraph('/organization/' + orgId + '/branding') : null;
       })().catch(() => null);
-        pass = branding?.hideKeepMeSignedIn === true;
-        detail = pass ? '"Stay signed in" er skjult' : '"Stay signed in" er synlig';
+        if (!branding) {
+          pass = null;
+          detail = 'Kunden har ikke opsat firmabranding – "Stay signed in" er derfor synlig. Status er ikke ændret.';
+        } else {
+          pass = branding.hideKeepMeSignedIn === true;
+          detail = pass ? '"Stay signed in" er skjult' : '"Stay signed in" er synlig';
+        }
       }
       else if (c.check_id === '5.1.2.6') {
         // LinkedIn disabled
@@ -24950,7 +25023,7 @@ async function runAutomatedReview() {
       }
       else if (c.check_id === '5.3.1') {
         try {
-          const eligible = await callReviewGraph('/roleManagement/directory/roleEligibilityScheduleInstances?$top=10&$select=roleDefinitionId,principalId,status').catch(() => null);
+          const eligible = await callReviewGraph('/roleManagement/directory/roleEligibilityScheduleInstances?$top=10&$select=roleDefinitionId,principalId,memberType').catch(() => null);
           const active = await callReviewGraph("/roleManagement/directory/roleAssignmentScheduleInstances?$top=10&$select=roleDefinitionId,endDateTime,assignmentType").catch(() => null);
           const permanentActive = active?.value?.filter(a => !a.endDateTime && a.assignmentType === 'Assigned') || [];
           pass = (eligible?.value?.length || 0) > 0 && permanentActive.length === 0;
@@ -24959,6 +25032,7 @@ async function runAutomatedReview() {
             : permanentActive.length > 0
               ? `${permanentActive.length} permanente role assignments - bør bruge PIM aktivering`
               : 'Ingen eligible assignments - PIM muligvis ikke konfigureret';
+          if (window._needsP2 && !pass) { pass = null; detail = 'Kunden har ikke en licens, der understøtter denne kontrol (kræver Entra ID P2 / Identity Governance). Kan ikke vurderes automatisk.'; }
         } catch(e) {
           pass = null;
           detail = 'Verificer PIM i Entra > PIM > Microsoft Entra Roles';
@@ -24984,6 +25058,7 @@ async function runAutomatedReview() {
             pass = roleReviews.length > 0;
             detail = pass ? `${roleReviews.length} access reviews for privilegerede roller konfigureret` : 'Ingen access reviews for privilegerede roller fundet';
           }
+          if (window._needsP2 && !pass) { pass = null; detail = 'Kunden har ikke en licens, der understøtter denne kontrol (kræver Entra ID P2 / Identity Governance). Kan ikke vurderes automatisk.'; }
         } catch(e) {
           pass = null;
           detail = 'Verificer access reviews i Entra > Identity Governance > Access reviews';
@@ -25028,7 +25103,7 @@ async function runAutomatedReview() {
             }
           } else {
             pass = null;
-            detail = 'PIM ikke konfigureret - verificer manuelt i Entra > PIM';
+            detail = window._needsP2 ? 'Kunden har ikke en licens, der understøtter denne kontrol (kræver Entra ID P2 / Identity Governance). Kan ikke vurderes automatisk.' : 'PIM ikke konfigureret - verificer manuelt i Entra > PIM';
           }
         } catch(e) {
           pass = null;
@@ -25237,7 +25312,7 @@ async function runAutomatedReview() {
       detail = `Fejl: ${err.message}`;
     }
 
-    results[c.check_id] = { pass, detail };
+    results[c.check_id] = { pass, detail, noteOnly: pass === null && /^Kunden har ikke (en licens|opsat)/.test(detail || '') };
     logReview(c.check_id, pass === true ? 'implemented' : pass === false ? 'declined' : 'none', detail);
     await new Promise(r => setTimeout(r, 30)); // Small delay to not hit rate limits
   }
@@ -25313,7 +25388,20 @@ async function applyReviewResults() {
   }
 
   for (const [checkId, result] of Object.entries(results)) {
-    if (result.pass === null) continue; // Skip manual checks
+    if (result.pass === null) {
+      // Ikke vurderet automatisk. Licens-mangler skrives som note, status ændres ikke.
+      if (!result.noteOnly) continue;
+      if (!assessments[checkId]) assessments[checkId] = { status: 'none', comment: '' };
+      if (assessments[checkId].comment) continue;
+      assessments[checkId].comment = result.detail;
+      try {
+        const nd = { CustomerId: reviewCustomerId, CheckSpId: checkId, Status: assessments[checkId].status || 'none', Comment: result.detail.slice(0, 200), UpdatedBy: currentUser?.email || '' };
+        if (assessments[checkId].spId) await updateItem(listIds.assessments, assessments[checkId].spId, nd);
+        else { const nr = await createItem(listIds.assessments, nd); if (nr?.id) assessments[checkId].spId = nr.id; }
+        saved++;
+      } catch (e) { console.warn('Kunne ikke gemme note', checkId, e.message); }
+      continue;
+    }
 
     const status = result.pass ? 'implemented' : 'declined';
     const key = checkId;
