@@ -24170,7 +24170,7 @@ function missingReviewScopes(tok) {
 }
 
 async function doReviewLogin() {
-  const APP_BUILD = 'Build 2026-11-20 f (bevarer noter og status)';
+  const APP_BUILD = 'Build 2026-11-20 h (SMB-omfang + Exchange consent)';
   console.log('Security Baseline Tracker', APP_BUILD);
   try { logReview('BUILD', 'implemented', APP_BUILD); } catch (e) {}
   try {
@@ -24250,13 +24250,21 @@ async function doReviewLogin() {
       const wanted = [['Exchange', 'https://outlook.office365.com/.default', '_delExoToken'], ['Teams', '48ac35b8-9aa8-4d74-927d-1f4a14a0b239/.default', '_delTeamsToken']];
       for (const [navn, sc, key] of wanted) {
         try {
-          const tok = await getResourceToken(navn, sc);
+          let tok = await getResourceToken(navn, sc);
+          let tsc = tokenScopes(tok);
+          // Kunden har måske kun godkendt andre Exchange-rettigheder (fx Group.Read.All) – bed specifikt om Exchange.Manage
+          if (navn === 'Exchange' && tsc && !tsc.some(x => /^Exchange\.Manage/i.test(x))) {
+            if (confirm('For at tjekke Exchange mangler der en godkendelse hos kunden (Exchange.Manage).\n\nTryk OK og godkend i vinduet, der åbner.')) {
+              tok = (await reviewMsalInstance.acquireTokenPopup({ scopes: ['https://outlook.office365.com/Exchange.Manage'], account: resp.account, prompt: 'consent' })).accessToken;
+              tsc = tokenScopes(tok);
+              console.log('Exchange-token (efter consent) scopes:', tsc ? tsc.join(' ') : '(ukendt)');
+            }
+          }
           window[key] = tok;
-          const tsc = tokenScopes(tok);
           console.log(navn + '-token scopes:', tsc ? tsc.join(' ') : '(ukendt)');
           if (navn === 'Exchange' && tsc && !tsc.some(x => /^Exchange\.Manage/i.test(x))) {
-            logReview('TOKEN', 'review', 'Exchange-tokenet mangler Exchange.ManageV2 (har kun: ' + tsc.join(' ') + '). Tilføj Office 365 Exchange Online → Delegated → Exchange.ManageV2 i app-registreringen og giv admin consent.');
-            showToast('Exchange-tokenet mangler rettigheden Exchange.ManageV2 – se review-loggen', 'error');
+            logReview('TOKEN', 'review', 'Exchange-tokenet mangler Exchange.Manage (har kun: ' + tsc.join(' ') + '). Tilføj Office 365 Exchange Online → Delegated → Exchange.Manage i app-registreringen og giv admin consent.');
+            showToast('Exchange-tokenet mangler rettigheden Exchange.Manage – se review-loggen', 'error');
           } else {
             logReview('TOKEN', 'implemented', navn + '-token hentet. Rettigheder: ' + (tsc ? tsc.join(' ') : 'kunne ikke læses'));
           }
@@ -24383,8 +24391,12 @@ async function runAutomatedReview() {
   document.getElementById('review-footer').innerHTML = '';
 
   const results = {};
-  const total = checks.length;
+  // SMB-kunder gennemgås kun på de 104 kontroller i SMB-standarden. Enterprise får alle.
+  const reviewCustomerObj = customers.find(x => x.spId === reviewCustomerId);
+  const reviewChecks = scopedChecks(reviewCustomerObj);
+  const total = reviewChecks.length;
   let current = 0;
+  try { logReview('OMFANG', 'implemented', (customerLevel(reviewCustomerObj) === 'SMB' ? 'SMB-kunde' : 'Enterprise-kunde') + ': ' + total + ' af ' + checks.length + ' kontroller gennemgås'); } catch (e) {}
 
   // Call Azure Function for Exchange/Teams checks in parallel
   window._psResults = {};
@@ -24468,7 +24480,7 @@ async function runAutomatedReview() {
   const gaMembers = gaRoleId ? await callReviewGraph(`/directoryRoles/${gaRoleId}/members?$select=id,userPrincipalName,onPremisesSyncEnabled`) : null;
   const gaCount = gaMembers?.value?.length || 0;
 
-  for (const c of checks) {
+  for (const c of reviewChecks) {
     current++;
     updateReviewProgress(current, total, c.check_id);
 
