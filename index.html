@@ -24171,7 +24171,7 @@ function missingReviewScopes(tok) {
 }
 
 async function doReviewLogin() {
-  const APP_BUILD = 'Build 2026-11-20 j (CA-politikker + Ikke vurderet)';
+  const APP_BUILD = 'Build 2026-11-20 k (flere automatiske kontroller)';
   console.log('Security Baseline Tracker', APP_BUILD);
   try { logReview('BUILD', 'implemented', APP_BUILD); } catch (e) {}
   try {
@@ -24752,9 +24752,8 @@ async function runAutomatedReview() {
 
       // ── Section 3: Microsoft Purview ───────────────────────────────────
       else if (c.check_id === '3.1.1') {
-        // Check unified audit log via Graph Security API
-        pass = null;
-        detail = 'Verificer audit log status i Microsoft Purview > Audit > Search';
+        if (window._psResults?.['3.1.1'] !== undefined) { pass = window._psResults['3.1.1'].pass; detail = window._psResults['3.1.1'].detail; }
+        else { pass = null; detail = 'Verificer audit log status i Microsoft Purview > Audit > Search'; }
       }
       else if (c.check_id.startsWith('3.')) {
         detail = 'Verificer i Microsoft Purview compliance portal';
@@ -24988,18 +24987,27 @@ async function runAutomatedReview() {
         detail = pass ? 'Microsoft Authenticator number matching aktiveret' : 'Verificer Authenticator indstillinger';
       }
       else if (c.check_id === '5.2.3.2') {
-        const pwdProtection = await callReviewGraph('/policies/identitySecurityDefaultsEnforcementPolicy').catch(() => null);
-        const bannedPwd = await callReviewGraphBeta('/policies/authenticationStrengthPolicies').catch(() => null);
-        pass = null;
-        detail = 'Verificer custom banned passwords i Entra > Authentication methods > Password protection';
+        const st = await callReviewGraph('/settings').catch(() => null);
+        const pr = st?.value?.find(x => x.displayName === 'Password Rule Settings');
+        if (st && Array.isArray(st.value)) {
+          const v = n => pr?.values?.find(x => x.name === n)?.value;
+          const list = String(v('BannedPasswordList') || '').trim();
+          const on = String(v('EnableBannedPasswordCheck')).toLowerCase() === 'true';
+          pass = on && list.length > 0;
+          detail = pass ? 'Custom banned password-liste er aktiv (' + list.split(/\t|,/).filter(Boolean).length + ' ord)' : 'Ingen custom banned password-liste er aktiveret';
+        } else { pass = null; detail = 'Kunne ikke læse password protection-indstillinger – vurder manuelt'; }
       }
       else if (c.check_id === '5.2.3.3') {
         detail = 'Verificer on-premises password protection agent i Entra > Authentication > Password protection';
         pass = null;
       }
       else if (c.check_id === '5.2.3.4') {
-        pass = null;
-        detail = 'Verificer MFA registrering i Entra > Users > Per-user MFA eller MFA registration report';
+        const reg = await callReviewGraph("/reports/authenticationMethods/userRegistrationDetails?$filter=userType eq 'member'&$select=userPrincipalName,isMfaCapable&$top=999").catch(() => null);
+        if (reg && Array.isArray(reg.value) && reg.value.length) {
+          const bad = reg.value.filter(u => u.isMfaCapable === false);
+          pass = bad.length === 0;
+          detail = pass ? 'Alle ' + reg.value.length + ' medlemsbrugere er MFA-klar' : bad.length + ' af ' + reg.value.length + ' brugere er ikke MFA-klar (fx ' + bad.slice(0, 3).map(u => u.userPrincipalName).join(', ') + ')';
+        } else { pass = null; detail = 'MFA-registrering kunne ikke læses – vurder manuelt i Entra → MFA registration report'; }
       }
       else if (c.check_id === '5.2.3.5') {
         const authMethods = await callReviewGraph('/policies/authenticationMethodsPolicy');
