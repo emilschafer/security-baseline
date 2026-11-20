@@ -24170,6 +24170,9 @@ function missingReviewScopes(tok) {
 }
 
 async function doReviewLogin() {
+  const APP_BUILD = 'Build 2026-11-20 b (Exchange/Teams token pr. tjeneste)';
+  console.log('Security Baseline Tracker', APP_BUILD);
+  try { logReview('BUILD', 'implemented', APP_BUILD); } catch (e) {}
   try {
     reviewMsalInstance = new msal.PublicClientApplication({
       auth: {
@@ -24185,30 +24188,18 @@ async function doReviewLogin() {
     // Beder om rettighederne ved navn (ikke .default): så viser Microsoft automatisk samtykkevinduet,
     // hver gang appen har fået en ny rettighed som kunden endnu ikke har godkendt.
     const reviewScopeList = REVIEW_REQUIRED_SCOPES.map(x => 'https://graph.microsoft.com/' + x);
-    // Exchange og Teams har egne API'er. De får samtykke i SAMME vindue (extraScopesToConsent),
-    // og tokens til dem hentes bagefter stille med det samme login.
-    const EXO_CONSENT = 'https://outlook.office365.com/Exchange.Manage';
-    const TEAMS_CONSENT = '48ac35b8-9aa8-4d74-927d-1f4a14a0b239/user_impersonation';
+    // Login og samtykke til Graph. Exchange og Teams har egne API'er og får hver deres token bagefter.
     const isScopeErr = (e) => /AADSTS650053|AADSTS70011|AADSTS650052|AADSTS500011|invalid_scope/i.test(String(e.errorMessage || e.message || e));
     let resp;
-    let extrasOk = true;
     try {
-      resp = await reviewMsalInstance.loginPopup({ scopes: reviewScopeList, extraScopesToConsent: [EXO_CONSENT, TEAMS_CONSENT], prompt: 'select_account' });
-    } catch (e0) {
-      if (!isScopeErr(e0)) throw e0;
-      extrasOk = false;
-      console.warn('Exchange/Teams-rettigheder mangler i app-registreringen:', e0.errorMessage || e0.message);
-      showToast('Exchange/Teams-rettigheder mangler i app-registreringen, så de kontroller springes over: ' + String(e0.errorMessage || e0.message).slice(0, 200), 'error');
-      try {
-        resp = await reviewMsalInstance.loginPopup({ scopes: reviewScopeList, prompt: 'select_account' });
-      } catch (e1) {
-        if (isScopeErr(e1)) {
-          showToast('Appen mangler en rettighed i app-registreringen: ' + String(e1.errorMessage || e1.message).slice(0, 300), 'error');
-          console.error('Review login scope-fejl:', e1.errorMessage || e1.message);
-          return;
-        }
-        throw e1;
+      resp = await reviewMsalInstance.loginPopup({ scopes: reviewScopeList, prompt: 'select_account' });
+    } catch (e1) {
+      if (isScopeErr(e1)) {
+        showToast('Appen mangler en rettighed i app-registreringen: ' + String(e1.errorMessage || e1.message).slice(0, 300), 'error');
+        console.error('Review login scope-fejl:', e1.errorMessage || e1.message);
+        return;
       }
+      throw e1;
     }
 
     // Tjek hvilke rettigheder kundens tenant faktisk har godkendt, og bed om samtykke hvis noget mangler
@@ -24218,7 +24209,6 @@ async function doReviewLogin() {
       if (ok) {
         resp = await reviewMsalInstance.loginPopup({
           scopes: ['https://graph.microsoft.com/.default'],
-          extraScopesToConsent: extrasOk ? [EXO_CONSENT, TEAMS_CONSENT] : [],
           prompt: 'consent',
           account: resp.account
         });
@@ -24243,18 +24233,34 @@ async function doReviewLogin() {
     reviewMsalInstance.setActiveAccount(resp.account);
     window._delExoToken = null; window._delTeamsToken = null;
     window._reviewUpn = resp.account.username || '';
-    if (extrasOk) {
+    {
+      // Token til Exchange og Teams. Først stille; hvis kunden ikke har godkendt endnu, spørges der én gang pr. tjeneste.
+      const getResourceToken = async (navn, scope) => {
+        try {
+          return (await reviewMsalInstance.acquireTokenSilent({ scopes: [scope], account: resp.account })).accessToken;
+        } catch (se) {
+          const sm = String(se.errorCode || '') + ' ' + String(se.name || '') + ' ' + String(se.errorMessage || se.message || se);
+          if (!/interaction_required|consent_required|login_required|InteractionRequired|AADSTS65001|AADSTS50076|AADSTS50079/i.test(sm)) throw se;
+        }
+        if (!confirm('For at tjekke ' + navn + ' skal kundens administrator godkende adgang én gang.\n\nTryk OK og godkend i vinduet, der åbner.')) {
+          throw new Error('Godkendelse til ' + navn + ' blev afbrudt');
+        }
+        return (await reviewMsalInstance.acquireTokenPopup({ scopes: [scope], account: resp.account })).accessToken;
+      };
       const wanted = [['Exchange', 'https://outlook.office365.com/.default', '_delExoToken'], ['Teams', '48ac35b8-9aa8-4d74-927d-1f4a14a0b239/.default', '_delTeamsToken']];
       for (const [navn, sc, key] of wanted) {
         try {
-          const tr = await reviewMsalInstance.acquireTokenSilent({ scopes: [sc], account: resp.account });
-          window[key] = tr.accessToken;
-          const tsc = tokenScopes(tr.accessToken);
+          const tok = await getResourceToken(navn, sc);
+          window[key] = tok;
+          const tsc = tokenScopes(tok);
           console.log(navn + '-token scopes:', tsc ? tsc.join(' ') : '(ukendt)');
+          logReview('TOKEN', 'implemented', navn + '-token hentet. Rettigheder: ' + (tsc ? tsc.join(' ') : 'kunne ikke læses'));
         } catch (te) {
           const tm = String(te.errorMessage || te.message || te);
           console.warn(navn + '-token kunne ikke hentes:', tm);
-          logReview('TOKEN', 'review', navn + '-token kunne ikke hentes: ' + tm.slice(0, 220));
+          const hint = /AADSTS650057|AADSTS650053|AADSTS70011|AADSTS500011/i.test(tm) ? ' – rettigheden til ' + navn + ' mangler i app-registreringen (API permissions → Delegated)' : '';
+          logReview('TOKEN', 'review', navn + '-token kunne ikke hentes' + hint + ': ' + tm.slice(0, 260));
+          showToast(navn + '-kontroller springes over' + hint, 'error');
         }
       }
     }
