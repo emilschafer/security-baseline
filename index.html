@@ -24171,7 +24171,7 @@ function missingReviewScopes(tok) {
 }
 
 async function doReviewLogin() {
-  const APP_BUILD = 'Build 2026-11-23 w (rapport-layout)';
+  const APP_BUILD = 'Build 2026-11-23 y (uden Premium SMB i rapport)';
   console.log('Security Baseline Tracker', APP_BUILD);
   try { logReview('BUILD', 'implemented', APP_BUILD); } catch (e) {}
   try {
@@ -26269,7 +26269,7 @@ function buildSimpleReportHtml(c, kind) {
   const impl = infos.filter(i => i.st === 'implemented');
   const felt = impl.filter(i => i.note);
   const warned = impl.filter(i => i.big);
-  h += `<div class="page">${rptCover('IMPLEMENTERINGSRAPPORT', 'Implementeringsrapport', 'Premium SMB', c, dateStr)}
+  h += `<div class="page">${rptCover('IMPLEMENTERINGSRAPPORT', 'Implementeringsrapport', 'Sikkerhed i Microsoft 365', c, dateStr)}
     <h2>Sådan læser du rapporten</h2>
     <p>Rapporten fortæller, hvad ADDvision har sat op i jeres Microsoft 365-miljø, hvad det betyder for jeres medarbejdere i hverdagen, og hvad der er aftalt med jer. Den er skrevet, så den kan læses uden teknisk baggrund.</p>
     <table class="tile" style="margin:14px 0;"><tr>
@@ -26311,12 +26311,30 @@ function buildSimpleReportHtml(c, kind) {
     </table>
     <div class="box"><b style="color:#1F3864;">Har I spørgsmål eller ønsker ændringer?</b>
     <p>Kontakt din faste kontaktperson hos ADDvision. Hvis medarbejdere oplever noget, der ikke virker som forventet, kan I kontakte os, så ser vi på det med det samme.</p></div></div>`;
-  return { css, body: h, title: 'Implementeringsrapport Premium SMB – ' + c.name };
+  return { css, body: h, title: 'Implementeringsrapport – ' + c.name };
 }
 
-function exportSimpleReport(spId, kind, fmt) {
+async function exportSimpleReport(spId, kind, fmt) {
+  // Hent ALTID den valgte kundes egne vurderinger (ellers bliver rapporten tom, hvis kunden ikke er åbnet)
+  const prev = assessments;
+  const pw = fmt === 'pdf' ? window.open('', '_blank') : null; // åbnes før hentning, så pop-up ikke blokeres
+  try {
+    if (APP_CONFIG.demoMode) { assessments = demoData.assessments[spId] || {}; }
+    else {
+      showToast('Henter kundens data til rapporten...');
+      const items = await getListItems(listIds.assessments);
+      const fresh = {};
+      items.filter(i => i.CustomerId === spId && i.CheckSpId !== 'LATEST_REPORT')
+        .forEach(i => { fresh[i.CheckSpId] = { spId: i.spId, status: i.Status || 'none', comment: i.Comment || '' }; });
+      assessments = fresh;
+    }
+    _exportSimpleReportNow(spId, kind, fmt, pw);
+  } catch (e) { if (pw) pw.close(); showToast('Fejl: ' + e.message, 'error'); }
+  finally { assessments = prev; }
+}
+function _exportSimpleReportNow(spId, kind, fmt, pw) {
   const c = customers.find(x => x.spId === spId);
-  if (!c) return;
+  if (!c) { if (pw) pw.close(); return; }
   const lang = 'da';
   try {
     const r = buildSimpleReportHtml(c, kind);
@@ -26330,7 +26348,7 @@ function exportSimpleReport(spId, kind, fmt) {
       setTimeout(() => URL.revokeObjectURL(a.href), 4000);
       showToast('Word-dokument hentet', 'success');
     } else {
-      const w = window.open('', '_blank');
+      const w = pw || window.open('', '_blank');
       if (!w) { showToast('Pop-up blev blokeret – tillad pop-ups for siden og prøv igen', 'error'); return; }
       w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${escH(r.title)}</title><style>${r.css}</style></head><body>${r.body}</body></html>`);
       w.document.close(); w.focus();
