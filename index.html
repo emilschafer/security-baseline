@@ -24171,7 +24171,7 @@ function missingReviewScopes(tok) {
 }
 
 async function doReviewLogin() {
-  const APP_BUILD = 'Build 2026-11-20 p (venter på Exchange/Teams)';
+  const APP_BUILD = 'Build 2026-11-23 w (rapport-layout)';
   console.log('Security Baseline Tracker', APP_BUILD);
   try { logReview('BUILD', 'implemented', APP_BUILD); } catch (e) {}
   try {
@@ -25373,6 +25373,11 @@ async function runAutomatedReview() {
       detail = `Fejl: ${err.message}`;
     }
 
+    // Exchange/Teams-resultater fra funktionen går forud, når Graph-koden ikke selv kan vurdere kontrollen
+    try {
+      const pr = window._psResults && window._psResults[c.check_id];
+      if (pr && pr.pass !== null && pr.pass !== undefined && (pass === null || ['1.2.2', '1.3.3', '1.3.6', '1.3.9'].includes(c.check_id))) { pass = pr.pass; detail = pr.detail; }
+    } catch (e) {}
     results[c.check_id] = { pass, detail, noteOnly: pass === null && /^(Kunden har ikke |Fejl:|Kunne ikke |Verificer |Denne kontrol|\d+ aktive CA)/.test(detail || '') };
     logReview(c.check_id, pass === true ? 'implemented' : pass === false ? 'declined' : 'none', detail);
     await new Promise(r => setTimeout(r, 30)); // Small delay to not hit rate limits
@@ -25432,18 +25437,25 @@ async function applyReviewResults() {
   // Save Secure Score if available
   if (window._currentSecureScore) {
     try {
+      // Første måling bevares som "før", så rapporterne kan vise forbedringen
+      let prevSS = null;
+      try { prevSS = JSON.parse((assessments['SECURE_SCORE'] || {}).comment || 'null'); } catch (e) {}
+      const today = new Date().toISOString().slice(0, 10);
+      const firstSS = (prevSS && (prevSS.first || (prevSS.pct != null ? [prevSS.d || '', prevSS.pct, prevSS.current, prevSS.max] : null))) || [today, window._currentSecureScore.pct, window._currentSecureScore.current, window._currentSecureScore.max];
       const scoreData = {
         CustomerId: reviewCustomerId,
         CheckSpId: 'SECURE_SCORE',
         Status: 'none',
-        Comment: JSON.stringify(window._currentSecureScore),
+        Comment: JSON.stringify({ pct: window._currentSecureScore.pct, current: window._currentSecureScore.current, max: window._currentSecureScore.max, d: today, first: firstSS }),
         UpdatedBy: currentUser?.email || ''
       };
       const existing = assessments['SECURE_SCORE'];
       if (existing?.spId) {
         await updateItem(listIds.assessments, existing.spId, scoreData);
+        existing.comment = scoreData.Comment;
       } else {
-        await createItem(listIds.assessments, scoreData);
+        const nr0 = await createItem(listIds.assessments, scoreData);
+        assessments['SECURE_SCORE'] = { status: 'none', comment: scoreData.Comment, spId: nr0 && nr0.id };
       }
     } catch(e) { console.warn('Kunne ikke gemme Secure Score:', e); }
   }
@@ -26091,111 +26103,223 @@ function openCustomer(spId) {
 function setDetailTab(t) { detailTab = t; renderCustomerDetail(); }
 
 
-// ───────── Kunderapporter: Sikkerhedstjek (review) og Implementeringsrapport (SMB) ─────────
-const SR_TXT = {
-  da: { review:'Sikkerhedstjek', impl:'Implementeringsrapport – Premium SMB', customer:'Kunde', date:'Dato', basis:'Grundlag: CIS Microsoft 365 Foundations Benchmark v7.0.0',
-    summary:'Samlet overblik', ok:'I orden', open:'Skal håndteres', notAssessed:'Ikke vurderet', areas:'Status pr. område', area:'Område', light:'Status', okOf:'I orden', first:'Vigtigste ting at tage fat på først',
-    firstNone:'Ingen åbne punkter med høj risiko – godt gået.', control:'Kontrol', risk:'Risiko', why:'Hvorfor det er vigtigt', note:'Note', green:'Grøn', amber:'Gul', red:'Rød', grey:'Ikke vurderet',
-    foot:'Rapporten er et øjebliksbillede og vurderer indstillinger i kundens Microsoft 365-miljø.',
-    implIntro:'Denne rapport beskriver i almindeligt sprog, hvad vi har sat op for at beskytte jeres Microsoft 365-miljø, hvad I som brugere kan opleve, og hvad vi har aftalt.',
-    done:'Det vi har sat op', doneNone:'Ingen kontroller er markeret som implementeret endnu.', users:'Det kan I som brugere opleve', usersIntro:'Disse indstillinger kan ændre den daglige arbejdsgang. Spørg os, hvis noget virker uventet:',
-    usersNone:'Ingen af de implementerede indstillinger forventes at give mærkbare ændringer for brugerne.', agreed:'Det vi har aftalt', agreedIntro:'Punkter hvor vi sammen har valgt at acceptere en afvigelse eller et tilvalg:', agreedNone:'Ingen aftalte afvigelser eller tilvalg.',
-    next:'Det der mangler / næste skridt', nextNone:'Der er ingen åbne punkter.', pts:'kontroller' },
-  en: { review:'Security Check', impl:'Implementation Report – Premium SMB', customer:'Customer', date:'Date', basis:'Basis: CIS Microsoft 365 Foundations Benchmark v7.0.0',
-    summary:'Overall summary', ok:'In order', open:'Needs attention', notAssessed:'Not assessed', areas:'Status by area', area:'Area', light:'Status', okOf:'In order', first:'Most important items to address first',
-    firstNone:'No open high-risk items – well done.', control:'Control', risk:'Risk', why:'Why it matters', note:'Note', green:'Green', amber:'Amber', red:'Red', grey:'Not assessed',
-    foot:'This report is a snapshot and evaluates settings in the customer\'s Microsoft 365 environment.',
-    implIntro:'This report describes in plain language what we have configured to protect your Microsoft 365 environment, what you may notice as a user, and what we have agreed.',
-    done:'What we have set up', doneNone:'No controls are marked as implemented yet.', users:'What you may notice as a user', usersIntro:'These settings can change daily workflows. Contact us if something looks unexpected:',
-    usersNone:'None of the implemented settings are expected to cause noticeable changes for users.', agreed:'What we have agreed', agreedIntro:'Items where we have jointly chosen to accept a deviation or an option:', agreedNone:'No agreed deviations or options.',
-    next:'What is missing / next steps', nextNone:'There are no open items.', pts:'controls' }
-};
+const REPORT_DA = {"1.1.1":{"a":1,"t":"Administratorkonti er kun i skyen","w":"Administrator-konti er udelukkende oprettet i skyen og synkroniseres ikke fra jeres lokale netværk. Dette reducerer risikoen for at et angreb mod jeres lokale infrastruktur også kompromitterer jeres cloud-administratorer.","f":"Administrator-konti er udelukkende oprettet i skyen og synkroniseres ikke fra jeres lokale netværk.","n":"","b":0,"r":"Critical","i":"High"},"1.1.2":{"a":1,"t":"Nødadgangskonti","w":"Der er oprettet to nødadgangskonti (\"break glass\") som kan bruges i tilfælde af at normale admin-konti er utilgængelige. Disse konti opbevares sikkert og bruges kun i nødsituationer.","f":"Der er oprettet to nødadgangskonti (\"break glass\") som kan bruges i tilfælde af at normale admin-konti er utilgængelige.","n":"","b":0,"r":"Critical","i":"Low"},"1.1.3":{"a":1,"t":"Antal globale administratorer","w":"Antallet af globale administratorer er begrænset til mellem 2 og 4. Færre administratorer reducerer risikoen for misbrug, mens minimum 2 sikrer at der altid er backup-adgang.","f":"Antallet af globale administratorer er begrænset til mellem 2 og 4.","n":"","b":0,"r":"Critical","i":"High"},"1.1.4":{"a":1,"t":"Administratorers licenser","w":"Administrator-konti har ikke tildelt produktlicenser som Exchange, Teams eller Office. Dette begrænser hvad en kompromitteret admin-konto kan gøre skade på.","f":"Administrator-konti har ikke tildelt produktlicenser som Exchange, Teams eller Office.","n":"","b":0,"r":"Critical","i":"High"},"1.2.2":{"a":1,"t":"Login på delte postkasser","w":"Delte postkasser kan ikke logges ind på direkte. Delte postkasser bruges af flere brugere og bør ikke have egne login-rettigheder da dette er en sikkerhedsrisiko.","f":"Delte postkasser kan ikke logges ind på direkte.","n":"","b":0,"r":"Critical","i":"High"},"1.3.1":{"a":1,"t":"Udløb af adgangskoder","w":"Passwords udløber ikke automatisk. Moderne forskning viser at tvungne password-skift faktisk svækker sikkerheden da brugere vælger svagere passwords. I stedet bruges MFA og overvågning.","f":"Passwords udløber ikke automatisk.","n":"","b":0,"r":"High","i":"Low"},"1.3.2":{"a":4,"t":"Automatisk log ud på ikke-administrerede enheder","w":"Inaktive browser-sessioner logges automatisk ud efter maksimalt 3 timer. Dette forhindrer at uvedkommende kan overtage en glemt, åben session.","f":"Inaktive browser-sessioner logges automatisk ud efter maksimalt 3 timer.","n":"Brugere på ikke-administrerede enheder logges ud efter længere inaktivitet.","b":0,"r":"Medium","i":"High"},"1.3.3":{"a":2,"t":"Deling af kalender med eksterne","w":"Kalenderdetaljer kan ikke deles med personer uden for organisationen. Dette beskytter fortrolige møder og aftaler mod ekstern indsigt.","f":"Kalenderdetaljer kan ikke deles med personer uden for organisationen.","n":"Brugere kan ikke dele kalender med eksterne.","b":0,"r":"High","i":"Low"},"1.3.4":{"a":6,"t":"Brugeres egne apps og tjenester","w":"Brugere kan ikke selv oprette og registrere apps i Microsoft 365. Dette forhindrer at uautoriserede apps får adgang til virksomhedens data.","f":"Brugere kan ikke selv oprette og registrere apps i Microsoft 365.","n":"Brugere kan ikke selv anskaffe apps og tjenester uden om IT.","b":0,"r":"High","i":"Medium"},"1.3.5":{"a":7,"t":"Phishing-beskyttelse i Forms","w":"Microsoft Forms er beskyttet mod interne phishing-forsøg. Formularer kan ellers bruges til at narre medarbejdere til at afgive login-oplysninger.","f":"Microsoft Forms er beskyttet mod interne phishing-forsøg.","n":"","b":0,"r":"Low","i":"Medium"},"2.1.1":{"a":7,"t":"Safe Links (beskyttelse mod farlige links)","w":"Safe Links tjekker alle links i emails i realtid når du klikker på dem. Selv hvis et link ser sikkert ud, scannes det øjeblikkeligt for at beskytte mod phishing.","f":"Safe Links tjekker alle links i emails i realtid når du klikker på dem.","n":"Links i mails og Office-filer tjekkes, før de åbnes. Farlige links blokeres med en forklaring.","b":0,"r":"Critical","i":"Low"},"2.1.2":{"a":7,"t":"Filter for farlige filtyper","w":"Farlige filtyper som .exe, .bat og .ps1 blokeres automatisk i emails. Vedhæftninger med disse filtyper er en af de mest almindelige måder malware spredes på.","f":"Farlige filtyper som .exe, .bat og .ps1 blokeres automatisk i emails.","n":"Mails med farlige filtyper som vedhæftning bliver stoppet.","b":0,"r":"High","i":"High"},"2.1.3":{"a":7,"t":"Besked ved intern udsendelse af malware","w":"Administratorer modtager besked når malware opdages i emails. Giver mulighed for hurtig reaktion og opfølgning.","f":"Administratorer modtager besked når malware opdages i emails.","n":"","b":0,"r":"High","i":"Low"},"2.1.4":{"a":7,"t":"Safe Attachments (farlige vedhæftede filer)","w":"Safe Attachments åbner vedhæftninger i et sikkert miljø og tjekker for malware, inden de leveres til modtageren. Beskytter mod selv nye og ukendte trusler.","f":"Safe Attachments åbner vedhæftninger i et sikkert miljø og tjekker for malware, inden de leveres til modtageren.","n":"Vedhæftede filer scannes, så en mail kan komme et øjeblik senere. Farlige filer fjernes.","b":0,"r":"Critical","i":"Low"},"2.1.5":{"a":7,"t":"Safe Attachments til SharePoint, OneDrive og Teams","w":"Safe Attachments-beskyttelse er aktiveret for filer i SharePoint, OneDrive og Teams. Beskyttelsen gælder ikke kun emails men alle delte filer.","f":"Safe Attachments-beskyttelse er aktiveret for filer i SharePoint, OneDrive og Teams.","n":"Filer i SharePoint, OneDrive og Teams scannes. En fil, der er fundet farlig, kan ikke hentes.","b":0,"r":"High","i":"Medium"},"2.1.6":{"a":7,"t":"Besked til administratorer om spam","w":"Administratorer modtager besked når en bruger sender uønsket post. Kan indikere at en konto er kompromitteret og bruges til at sende spam.","f":"Administratorer modtager besked når en bruger sender uønsket post.","n":"","b":0,"r":"High","i":"Low"},"2.1.7":{"a":7,"t":"Anti-phishing-politik","w":"En tilpasset anti-phishing politik beskytter mod forsøg på at udgive sig for betroede afsendere. Reducerer risikoen for at medarbejdere narres til at udlevere oplysninger.","f":"En tilpasset anti-phishing politik beskytter mod forsøg på at udgive sig for betroede afsendere.","n":"Mails, der ligner efterligninger af kolleger eller kendte afsendere, lægges i karantæne. Brugerne får besked.","b":0,"r":"Critical","i":"Medium"},"2.1.8":{"a":3,"t":"SPF (afsender-tjek)","w":"SPF-records er konfigureret for alle domæner og verificerer at emails sendes fra autoriserede servere. Forhindrer at kriminelle sender emails der ser ud til at komme fra jer.","f":"SPF-records er konfigureret for alle domæner og verificerer at emails sendes fra autoriserede servere.","n":"","b":0,"r":"Critical","i":"Low"},"2.1.9":{"a":3,"t":"DKIM (signering af udgående mail)","w":"DKIM signerer alle udgående emails digitalt. Modtagere kan verificere at emailen ikke er blevet ændret undervejs og faktisk stammer fra jer.","f":"DKIM signerer alle udgående emails digitalt.","n":"","b":0,"r":"Critical","i":"Low"},"2.1.10":{"a":3,"t":"DMARC (beskyttelse mod falske mails)","w":"DMARC fortæller modtagerens mailserver hvad der skal ske med emails der ikke passerer SPF og DKIM-tjek. Forhindrer effektivt email-spoofing af jeres domæne.","f":"DMARC fortæller modtagerens mailserver hvad der skal ske med emails der ikke passerer SPF og DKIM-tjek.","n":"","b":0,"r":"Critical","i":"Medium"},"2.1.12":{"a":3,"t":"Tilladt-liste for IP-adresser i mailfilter","w":"IP-adresser er ikke sat på en \"altid tillad\"-liste i spam-filteret. Sådanne lister kan omgå sikkerhedskontroller og bør ikke bruges.","f":"IP-adresser er ikke sat på en \"altid tillad\"-liste i spam-filteret.","n":"","b":0,"r":"High","i":"Low"},"2.1.13":{"a":3,"t":"Sikker afsenderliste i mailfilter","w":"Microsofts standard \"safe list\" er deaktiveret. Listen inkluderer kendte afsendere men kan misbruges til at omgå spam-filtrering.","f":"Microsofts standard \"safe list\" er deaktiveret.","n":"","b":0,"r":"High","i":"Low"},"2.1.14":{"a":3,"t":"Tilladte domæner i spamfilter","w":"Ingen domæner er sat på en \"altid tillad\"-liste i anti-spam. Tilladte domæner omgår spam-beskyttelse og udgør en sikkerhedsrisiko.","f":"Ingen domæner er sat på en \"altid tillad\"-liste i anti-spam.","n":"","b":0,"r":"High","i":"Low"},"2.1.15":{"a":3,"t":"Grænser for udgående mail","w":"Der er sat grænser for hvor mange emails en konto kan sende per time. Forhindrer at en kompromitteret konto bruges til masseafsendelse af spam.","f":"Der er sat grænser for hvor mange emails en konto kan sende per time.","n":"","b":0,"r":"High","i":"High"},"2.4.5":{"a":7,"t":"Automatisk undersøgelse og afhjælpning af trusler","w":"Automatisk efterforskning og afhjælpning er aktiveret. Microsoft Defender kan automatisk isolere og håndtere sikkerhedshændelser uden manuel indgriben.","f":"Automatisk efterforskning og afhjælpning er aktiveret.","n":"","b":0,"r":"High","i":"High"},"3.1.1":{"a":7,"t":"Sikkerhedslog (audit)","w":"Unified Audit Log optager alle handlinger i Microsoft 365. Giver fuld sporbarhed og er afgørende for at efterforske sikkerhedshændelser.","f":"Unified Audit Log optager alle handlinger i Microsoft 365.","n":"","b":0,"r":"Critical","i":"Low"},"3.3.1":{"a":7,"t":"Følsomhedsmærkning","w":"Følsomhedsmærker er publiceret og tilgængelige for brugerne. Giver mulighed for at klassificere og beskytte dokumenter og emails efter fortrolighedsniveau.","f":"Følsomhedsmærker er publiceret og tilgængelige for brugerne.","n":"Nye SharePoint-sites får automatisk en følsomhedsmærkning (Intern, Fortrolig, Meget fortrolig).","b":0,"r":"High","i":"Medium"},"4.1":{"a":5,"t":"Enheder uden compliance-politik","w":"Enheder uden en compliance-politik markeres automatisk som ikke-kompatible. Sikrer at alle enheder aktivt overvåges og vurderes mod sikkerhedskrav.","f":"Enheder uden en compliance-politik markeres automatisk som ikke-kompatible.","n":"Enheder uden compliance-politik betragtes som ikke-kompatible og kan blive afvist ved login.","b":0,"r":"High","i":"Medium"},"4.2":{"a":5,"t":"Tilmelding af private enheder","w":"Private enheder kan som standard ikke tilmeldes virksomhedens enhedsstyring. Det giver bedre kontrol over, hvilke enheder der får adgang til firmaets data.","f":"Private enheder kan som standard ikke tilmeldes virksomhedens enhedsstyring.","n":"Brugere kan ikke tilmelde private enheder til firmaets enhedsstyring.","b":1,"r":"High","i":"Medium"},"5.1.2.1":{"a":4,"t":"To-trins pr. bruger (gammel metode)","w":"Den ældre per-bruger MFA-metode er deaktiveret til fordel for Conditional Access. Giver mere fleksibel og effektiv MFA-styring.","f":"Den ældre per-bruger MFA-metode er deaktiveret til fordel for Conditional Access.","n":"","b":0,"r":"High","i":"High"},"5.1.2.2":{"a":6,"t":"Brugeres registrering af apps","w":"Brugere kan ikke selv registrere apps i Azure AD. Forhindrer at ikke-godkendte apps får adgang til virksomhedens data og ressourcer.","f":"Brugere kan ikke selv registrere apps i Azure AD.","n":"Brugere kan ikke selv registrere apps.","b":0,"r":"High","i":"High"},"5.1.2.3":{"a":1,"t":"Oprettelse af nye tenants","w":"Brugere kan ikke oprette nye Microsoft 365-tenants. Forhindrer at medarbejdere utilsigtet opretter skygge-IT løsninger.","f":"Brugere kan ikke oprette nye Microsoft 365-tenants.","n":"Brugere kan ikke oprette nye tenants.","b":0,"r":"Medium","i":"Medium"},"5.1.2.4":{"a":1,"t":"Adgang til Entra admin center","w":"Almindelige brugere har ikke adgang til Entra ID-administrationsportalen. Begrænser eksponeringen af følsomme identitetsoplysninger.","f":"Almindelige brugere har ikke adgang til Entra ID-administrationsportalen.","n":"Almindelige brugere kan ikke åbne Entra admin center.","b":0,"r":"High","i":"Medium"},"5.1.3.1":{"a":1,"t":"Oprettelse af sikkerhedsgrupper","w":"Brugere kan ikke oprette sikkerhedsgrupper. Gruppeadministration håndteres af IT for at opretholde kontrol over adgangsstyring.","f":"Brugere kan ikke oprette sikkerhedsgrupper.","n":"Brugere kan ikke selv oprette sikkerhedsgrupper.","b":0,"r":"High","i":"Medium"},"5.1.3.3":{"a":1,"t":"Gruppeejere og medlemsanmodninger","w":"Brugere kan ikke give gæster adgang til grupper de ejer. Forhindrer ukontrolleret ekstern adgang til interne ressourcer.","f":"Brugere kan ikke give gæster adgang til grupper de ejer.","n":"","b":0,"r":"Low","i":"Medium"},"5.1.3.4":{"a":2,"t":"Oprettelse af Teams og Microsoft 365-grupper","w":"Brugere kan ikke oprette Microsoft 365-grupper selv. Kontrollerer væksten af grupper og sikrer ordentlig governance.","f":"Brugere kan ikke oprette Microsoft 365-grupper selv.","n":"Brugere kan ikke selv oprette Teams og Microsoft 365-grupper; det sker via IT.","b":0,"r":"Medium","i":"Medium"},"5.1.4.2":{"a":5,"t":"Antal enheder pr. bruger","w":"Der er sat en grænse for antal enheder en bruger kan registrere. Forhindrer misbrug og holder styr på enhedsparken.","f":"Der er sat en grænse for antal enheder en bruger kan registrere.","n":"","b":0,"r":"High","i":"Medium"},"5.1.4.3":{"a":5,"t":"Global administrator som lokal administrator","w":"Global Administrator tilføjes ikke automatisk som lokal administrator på tilmeldte enheder. Begrænser privilegerede adgange til det nødvendige minimum.","f":"Global Administrator tilføjes ikke automatisk som lokal administrator på tilmeldte enheder.","n":"","b":0,"r":"High","i":"Medium"},"5.1.4.4":{"a":5,"t":"Lokal administrator ved enhedstilmelding","w":"Lokal administrator-rettigheder på Entra-tilmeldte enheder styres via Privileged Identity Management. Giver kontrolleret og auditeret adgang.","f":"Lokal administrator-rettigheder på Entra-tilmeldte enheder styres via Privileged Identity Management.","n":"","b":0,"r":"Medium","i":"Medium"},"5.1.4.5":{"a":5,"t":"Rotation af lokal administrator-adgangskode (LAPS)","w":"Local Administrator Password Solution (LAPS) er aktiveret. Giver unikke, roterende lokale administratorpasswords til alle enheder.","f":"Local Administrator Password Solution (LAPS) er aktiveret.","n":"","b":0,"r":"High","i":"Medium"},"5.1.5.1":{"a":6,"t":"Brugeres samtykke til apps","w":"Brugeres adgang til at give apps tilladelser er begrænset. Apps der beder om adgang til data skal godkendes af en administrator.","f":"Brugeres adgang til at give apps tilladelser er begrænset.","n":"Brugere kan ikke selv give apps adgang til firmadata; nye apps godkendes af IT.","b":0,"r":"High","i":"Medium"},"5.1.5.2":{"a":6,"t":"Godkendelsesproces for nye apps","w":"Admin consent workflow er aktiveret. Brugere kan anmode om adgang til apps, og administratorer modtager og behandler disse anmodninger.","f":"Admin consent workflow er aktiveret.","n":"","b":0,"r":"High","i":"Medium"},"5.1.5.4":{"a":6,"t":"Levetid for app-adgangskoder","w":"Apps er begrænset fra at bruge langvarige credentials. Reducerer risikoen ved kompromitterede app-legitimationsoplysninger.","f":"Apps er begrænset fra at bruge langvarige credentials.","n":"","b":0,"r":"High","i":"High"},"5.1.5.5":{"a":6,"t":"Genererede app-adgangskoder","w":"Certifikater med lang levetid er begrænset for app-registreringer. Kortere levetid reducerer eksponeringsvinduet ved kompromittering.","f":"Certifikater med lang levetid er begrænset for app-registreringer.","n":"","b":0,"r":"High","i":"High"},"5.1.5.6":{"a":6,"t":"Levetid for app-certifikater","w":"Federated credentials til apps er begrænset og kontrolleret. Forhindrer misbrug af identitetsfederation til at opnå uautoriseret adgang.","f":"Federated credentials til apps er begrænset og kontrolleret.","n":"","b":0,"r":"High","i":"High"},"5.1.6.2":{"a":2,"t":"Gæsters adgang","w":"Gæstebrugere har begrænset adgang til directory-information. Gæster kan ikke se intern organisationsstruktur og brugeroplysninger.","f":"Gæstebrugere har begrænset adgang til directory-information.","n":"","b":0,"r":"High","i":"Medium"},"5.2.2.1":{"a":4,"t":"To-trins-godkendelse for administratorer","w":"MFA er påkrævet for alle administratorer. Selv hvis en admin-konto kompromitteres, kan angriberen ikke logge ind uden den anden faktor.","f":"MFA er påkrævet for alle administratorer.","n":"","b":0,"r":"Critical","i":"High"},"5.2.2.2":{"a":4,"t":"To-trins-godkendelse for alle brugere","w":"MFA er påkrævet for alle brugere. Beskytter alle konti mod kontoovertagelse selv hvis password er lækket.","f":"MFA er påkrævet for alle brugere.","n":"Alle brugere skal bruge to-trins-godkendelse ved login.","b":1,"r":"Critical","i":"High"},"5.2.2.4":{"a":4,"t":"Login-frekvens for administratorer","w":"Gammel autentificering (legacy protocols) er blokeret. Disse protokoller understøtter ikke MFA og er hyppigt misbrugt af angribere.","f":"Gammel autentificering (legacy protocols) er blokeret.","n":"","b":0,"r":"Critical","i":"Medium"},"5.2.2.5":{"a":4,"t":"Phishing-sikker godkendelse for administratorer","w":"Brugere med høj risiko skal skifte password. Automatisk reaktion på opdagede kontorisici.","f":"Brugere med høj risiko skal skifte password.","n":"Administratorer skal bruge phishing-sikker godkendelse (fx sikkerhedsnøgle).","b":0,"r":"High","i":"High"},"5.2.2.9":{"a":4,"t":"Krav om administreret enhed ved login","w":"Privileged Identity Management kræver MFA ved aktivering af roller. Ekstra beskyttelse ved opnåelse af administrative rettigheder.","f":"Privileged Identity Management kræver MFA ved aktivering af roller.","n":"Login til firmaets tjenester kræver en administreret enhed.","b":1,"r":"High","i":"High"},"5.2.2.10":{"a":4,"t":"Krav ved registrering af godkendelsesmetoder","w":"Continuous Access Evaluation er aktiveret. Sessioner kan tilbagekaldes øjeblikkeligt ved opdagede risici uden at vente på token-udløb.","f":"Continuous Access Evaluation er aktiveret.","n":"Registrering af godkendelsesmetoder kræver administreret enhed eller firmanetværk.","b":0,"r":"Medium","i":"High"},"5.2.2.11":{"a":4,"t":"Login-frekvens ved Intune-tilmelding","w":"Brugere udenfor landet blokeres eller kræver ekstra verifikation. Begrænser angrebsfladen fra internationale trusselsaktører.","f":"Brugere udenfor landet blokeres eller kræver ekstra verifikation.","n":"","b":0,"r":"High","i":"Medium"},"5.2.2.12":{"a":4,"t":"Blokering af device code-login","w":"Adgang fra anonyme netværk som TOR blokeres. Angribere bruger ofte anonymiseringsnetværk for at skjule deres placering.","f":"Adgang fra anonyme netværk som TOR blokeres.","n":"","b":0,"r":"High","i":"Medium"},"5.2.2.13":{"a":4,"t":"Gentaget login med jævne mellemrum","w":"Microsoft 365 administration kræver compliant enhed. Sikrer at kun godkendte og opdaterede enheder kan administrere miljøet.","f":"Microsoft 365 administration kræver compliant enhed.","n":"Brugere skal logge ind igen med jævne mellemrum.","b":0,"r":"High","i":"Medium"},"5.2.2.14":{"a":4,"t":"Kendte netværk og lokationer","w":"Gæstebrugere har begrænsede sessioner og kræver MFA. Ekstern adgang er tæt kontrolleret og tidsbegrænset.","f":"Gæstebrugere har begrænsede sessioner og kræver MFA.","n":"","b":0,"r":"Medium","i":"High"},"5.2.2.15":{"a":4,"t":"Blokering af login fra ikke-godkendte lande","w":"Adgang fra ukendte lokationer kræver ekstra verifikation. Beskytter mod login-forsøg fra usædvanlige geografiske placeringer.","f":"Adgang fra ukendte lokationer kræver ekstra verifikation.","n":"Login fra ikke-godkendte lande blokeres. Landelisten tilpasses kunden.","b":1,"r":"Medium","i":"High"},"5.2.2.16":{"a":4,"t":"Beskyttelse mod tyveri af login-sessioner","w":"Sessioner fra ukompliant enheder er tidsbegrænsede. Enheder der ikke overholder sikkerhedspolitikker får begrænset adgang.","f":"Sessioner fra ukompliant enheder er tidsbegrænsede.","n":"Nogle native apps og ældre klienter kan blive afvist. Starter i rapport-tilstand.","b":1,"r":"Medium","i":"Medium"},"5.2.2.17":{"a":4,"t":"Blokering af authentication transfer","w":"Intern adgang kræver compliant enhed til følsomme ressourcer. Selv interne brugere skal bruge godkendte enheder til kritiske systemer.","f":"Intern adgang kræver compliant enhed til følsomme ressourcer.","n":"","b":0,"r":"Medium","i":"High"},"5.2.3.1":{"a":4,"t":"Beskyttelse mod MFA-træthed","w":"Microsoft Authenticator er konfigureret med number matching. Forhindrer MFA-trætthedsangreb hvor brugere godkender uden at have initieret login.","f":"Microsoft Authenticator er konfigureret med number matching.","n":"","b":0,"r":"High","i":"Medium"},"5.2.3.2":{"a":4,"t":"Forbudte adgangskoder","w":"Custom bannede passwords er aktiveret. Organisationsspecifikke ord og varianter heraf er forbudt som passwords.","f":"Custom bannede passwords er aktiveret.","n":"","b":0,"r":"High","i":"High"},"5.2.3.4":{"a":4,"t":"Alle brugere er klar til to-trins","w":"Alle brugere er MFA-capable med en stærk autentificeringsmetode. Sikrer at MFA-politikker kan håndhæves for alle brugere.","f":"Alle brugere er MFA-capable med en stærk autentificeringsmetode.","n":"","b":0,"r":"Critical","i":"Medium"},"5.2.3.5":{"a":4,"t":"Svage godkendelsesmetoder slået fra","w":"Svage autentificeringsmetoder som SMS og taleopkald er deaktiveret. Disse metoder kan omgås via SIM-swapping og sociale ingeniørangreb.","f":"Svage autentificeringsmetoder som SMS og taleopkald er deaktiveret.","n":"Svage godkendelsesmetoder (fx SMS og telefonopkald) kan ikke længere bruges.","b":0,"r":"Critical","i":"Medium"},"5.2.3.6":{"a":4,"t":"Anbefalet godkendelsesmetode (system-preferred)","w":"System-preferred MFA er aktiveret. Brugere opfordres til at bruge den stærkeste tilgængelige autentificeringsmetode.","f":"System-preferred MFA er aktiveret.","n":"","b":0,"r":"Medium","i":"Low"},"5.2.3.8":{"a":4,"t":"Spærring efter mislykkede logins","w":"Account lockout er konfigureret med passende grænse. For mange fejlede loginforsøg låser kontoen automatisk.","f":"Account lockout er konfigureret med passende grænse.","n":"","b":0,"r":"High","i":"Medium"},"5.2.3.9":{"a":4,"t":"Varighed af kontospærring","w":"Lockout-perioden er tilstrækkelig lang. Forhindrer hurtige gentagne forsøg efter en lockout.","f":"Lockout-perioden er tilstrækkelig lang.","n":"","b":0,"r":"High","i":"Medium"},"5.2.3.10":{"a":4,"t":"Authenticator i ledsager-apps","w":"Microsoft Authenticator companion app er deaktiveret. Forhindrer brug af Authenticator på ure og andre enheder der er sværere at sikre.","f":"Microsoft Authenticator companion app er deaktiveret.","n":"","b":0,"r":"Medium","i":"Medium"},"5.2.4.1":{"a":4,"t":"Selvbetjent nulstilling af adgangskode","w":"Self-service password reset er aktiveret for alle brugere. Brugere kan nulstille deres eget password uden at kontakte IT.","f":"Self-service password reset er aktiveret for alle brugere.","n":"","b":0,"r":"Low","i":"Medium"},"5.2.4.3":{"a":4,"t":"Genbekræftelse ved nulstilling","w":"Brugere skal registrere verifikationsmetoder ved næste login. Sikrer at alle er klar til at bruge SSPR.","f":"Brugere skal registrere verifikationsmetoder ved næste login.","n":"","b":0,"r":"Low","i":"Low"},"5.2.4.4":{"a":4,"t":"Besked til brugere ved nulstilling af adgangskode","w":"Brugere modtager besked ved password-nulstilling. Giver mulighed for at opdage uautoriserede password-ændringer.","f":"Brugere modtager besked ved password-nulstilling.","n":"","b":0,"r":"Low","i":"Medium"},"5.2.4.5":{"a":4,"t":"Besked til administratorer ved nulstilling","w":"Alle administratorer modtager besked når en admin-konto nulstiller sit password. Ekstra overvågning af privilegerede konti.","f":"Alle administratorer modtager besked når en admin-konto nulstiller sit password.","n":"","b":0,"r":"Low","i":"Medium"},"6.1.1":{"a":7,"t":"Postkasse-audit er slået til","w":"Mailbox-auditing er aktiveret for hele organisationen. Alle handlinger på mailboxe logges og kan efterforskes.","f":"Mailbox-auditing er aktiveret for hele organisationen.","n":"","b":0,"r":"Critical","i":"Low"},"6.1.2":{"a":7,"t":"Handlinger der logges i postkasser","w":"Detaljerede audit-handlinger er konfigureret for alle mailboxe. Giver fuld sporbarhed over hvem der har tilgået og gjort hvad med emails.","f":"Detaljerede audit-handlinger er konfigureret for alle mailboxe.","n":"","b":0,"r":"Medium","i":"Low"},"6.1.3":{"a":7,"t":"Undtagelser fra postkasse-audit","w":"Ingen konti har fået lov til at omgå mailbox-auditing. Sikrer at alle handlinger logges uanset hvem der udfører dem.","f":"Ingen konti har fået lov til at omgå mailbox-auditing.","n":"","b":0,"r":"Critical","i":"Low"},"6.2.1":{"a":3,"t":"Automatisk videresendelse af mail","w":"Automatisk videresendelse af emails til eksterne adresser er blokeret. Forhindrer at angribere stille og roligt kopierer al email til en ekstern konto.","f":"Automatisk videresendelse af emails til eksterne adresser er blokeret.","n":"Brugere kan ikke længere videresende mail automatisk til private adresser.","b":1,"r":"Critical","i":"High"},"6.2.2":{"a":3,"t":"Undtagelser, der omgår spamfilteret","w":"Transport-regler der omgår spam-filtrering er fjernet. Alle emails behandles ens og gennemgår de samme sikkerhedskontroller.","f":"Transport-regler der omgår spam-filtrering er fjernet.","n":"","b":0,"r":"Critical","i":"High"},"6.2.3":{"a":3,"t":"Mærkning af mails udefra","w":"Emails fra eksterne afsendere vises med en tydelig advarsel i Outlook. Hjælper medarbejdere med at identificere phishing og social engineering forsøg.","f":"Emails fra eksterne afsendere vises med en tydelig advarsel i Outlook.","n":"Mails udefra mærkes som eksterne.","b":0,"r":"High","i":"High"},"6.3.1":{"a":3,"t":"Installation af Outlook-tilføjelser","w":"Brugere kan ikke installere Outlook-tilføjelsesprogrammer selv. Forhindrer at usikre eller ondsindede add-ins installeres og får adgang til emails.","f":"Brugere kan ikke installere Outlook-tilføjelsesprogrammer selv.","n":"Brugere kan ikke selv installere tilføjelser i Outlook.","b":0,"r":"High","i":"Medium"},"6.3.2":{"a":3,"t":"Private konti i Outlook","w":"Personlige email-konti kan ikke tilføjes i Outlook på nettet. Forhindrer at virksomhedsdata blandes med private emails og omgår DLP-politikker.","f":"Personlige email-konti kan ikke tilføjes i Outlook på nettet.","n":"Brugere kan ikke tilføje private mail- og kalenderkonti i Outlook på nettet.","b":0,"r":"High","i":"Medium"},"6.5.1":{"a":3,"t":"Moderne login til Exchange","w":"Modern Authentication er aktiveret for Exchange Online. Ældre autentificeringsmetoder der ikke understøtter MFA er erstattet.","f":"Modern Authentication er aktiveret for Exchange Online.","n":"","b":0,"r":"High","i":"High"},"6.5.2":{"a":3,"t":"Advarsler i Outlook (MailTips)","w":"MailTips viser advarsler når emails sendes til store grupper eller externe modtagere. Hjælper med at forhindre utilsigtede datalækager via email.","f":"MailTips viser advarsler når emails sendes til store grupper eller externe modtagere.","n":"","b":0,"r":"Medium","i":"Low"},"6.5.4":{"a":3,"t":"SMTP AUTH (gammel mailmetode)","w":"SMTP AUTH er deaktiveret for organisationen. Forhindrer angribere i at bruge kompromitterede konti til at sende spam via SMTP.","f":"SMTP AUTH er deaktiveret for organisationen.","n":"Scannere og ældre systemer, der sender mail via SMTP AUTH, kan holde op med at virke.","b":1,"r":"Critical","i":"Low"},"6.5.5":{"a":3,"t":"Direct Send","w":"Direct Send er ikke tilladt via anonyme forbindelser. Forhindrer at uautoriserede afsendere sender emails via jeres mailserver.","f":"Direct Send er ikke tilladt via anonyme forbindelser.","n":"Systemer, der sender mail direkte (Direct Send), kan blive afvist.","b":0,"r":"High","i":"Medium"},"7.2.1":{"a":2,"t":"Moderne login til SharePoint","w":"Gammel autentificering er deaktiveret for SharePoint og OneDrive. Kræver moderne sikkerhedsmetoder der understøtter MFA.","f":"Gammel autentificering er deaktiveret for SharePoint og OneDrive.","n":"","b":0,"r":"High","i":"Medium"},"7.2.2":{"a":2,"t":"Eksterne gæster via Entra B2B","w":"Azure AD B2B-integration er aktiveret for gæstesamarbejde. Gæster autentificeres sikkert via deres eget Microsoft-id.","f":"Azure AD B2B-integration er aktiveret for gæstesamarbejde.","n":"","b":0,"r":"High","i":"Medium"},"7.2.3":{"a":2,"t":"Ekstern deling i SharePoint","w":"Ekstern deling af SharePoint er begrænset til kendte gæster. Nye, ukendte personer kan ikke inviteres direkte til SharePoint-sites.","f":"Ekstern deling af SharePoint er begrænset til kendte gæster.","n":"Brugere kan ikke dele indhold frit med eksterne.","b":0,"r":"Critical","i":"Medium"},"7.2.4":{"a":2,"t":"Ekstern deling fra OneDrive","w":"Ekstern deling af OneDrive er begrænset. Filer i OneDrive kan ikke frit deles med hvem som helst udenfor organisationen.","f":"Ekstern deling af OneDrive er begrænset.","n":"Ekstern deling fra OneDrive begrænses.","b":0,"r":"High","i":"Medium"},"7.2.6":{"a":2,"t":"Ekstern deling begrænset til godkendte domæner","w":"Eksterne brugere kan ikke dele det de har fået adgang til, videre til andre. Begrænser spredningen af delt indhold.","f":"Eksterne brugere kan ikke dele det de har fået adgang til, videre til andre.","n":"Ekstern deling i SharePoint begrænses.","b":0,"r":"Critical","i":"High"},"7.2.7":{"a":2,"t":"Delingslinks","w":"Standard delingslinks er konfigureret til at give adgang til specifikke personer. Forhindrer at der utilsigtet deles links der giver adgang til alle.","f":"Standard delingslinks er konfigureret til at give adgang til specifikke personer.","n":"Delingslinks begrænses som standard.","b":0,"r":"High","i":"Medium"},"7.2.9":{"a":2,"t":"Automatisk udløb af gæsteadgang","w":"Gæsters adgang udløber automatisk. Tidsbegrænsede adgange sikrer at tidligere gæster ikke bevarer adgang ubegrænset.","f":"Gæsters adgang udløber automatisk.","n":"Gæsters adgang til sites og filer udløber automatisk.","b":0,"r":"High","i":"Medium"},"7.2.10":{"a":2,"t":"Gentagen godkendelse af eksterne med engangskode","w":"Adgang via engangskoder for gæster er begrænset. Kontrollerer hvilke metoder der bruges til at autentificere eksterne brugere.","f":"Adgang via engangskoder for gæster er begrænset.","n":"","b":0,"r":"Medium","i":"Medium"},"7.2.11":{"a":2,"t":"Standardrettighed på delingslinks","w":"Standard delings-links giver kun læseadgang. Forhindrer at delte links utilsigtet giver redigeringsrettigheder.","f":"Standard delings-links giver kun læseadgang.","n":"","b":0,"r":"High","i":"Low"},"7.3.1":{"a":2,"t":"Download af inficerede filer","w":"Download af inficerede filer er blokeret. SharePoint og OneDrive scanner filer og forhindrer download af kendte trusler.","f":"Download af inficerede filer er blokeret.","n":"","b":0,"r":"High","i":"Medium"},"8.1.2":{"a":2,"t":"Mail til Teams-kanaler","w":"Emails kan ikke sendes til Teams-kanaler fra eksterne adresser. Forhindrer at kanaler misbruges til at levere spam eller phishing.","f":"Emails kan ikke sendes til Teams-kanaler fra eksterne adresser.","n":"","b":0,"r":"Low","i":"Medium"},"8.2.1":{"a":2,"t":"Eksterne domæner i Teams","w":"Ekstern adgang i Teams er begrænset til godkendte domæner. Kontrollerer hvilke eksterne organisationer der kan kommunikere med jer via Teams.","f":"Ekstern adgang i Teams er begrænset til godkendte domæner.","n":"Kommunikation med eksterne Teams-domæner begrænses til godkendte domæner.","b":0,"r":"Critical","i":"Medium"},"8.2.2":{"a":2,"t":"Kontakt med private Teams-konti","w":"Kommunikation med ikke-administrerede Teams-brugere er deaktiveret. Forhindrer kontakt med brugere der ikke er en del af en organisation.","f":"Kommunikation med ikke-administrerede Teams-brugere er deaktiveret.","n":"Brugere kan ikke chatte med Teams-brugere uden for administrerede organisationer.","b":0,"r":"Critical","i":"Medium"},"8.2.3":{"a":2,"t":"Eksterne må starte samtaler","w":"Teams-forbrugere kan ikke selv starte kontakt. Eksterne Teams-brugere kan ikke uopfordret kontakte jeres medarbejdere.","f":"Teams-forbrugere kan ikke selv starte kontakt.","n":"Eksterne Teams-brugere kan ikke starte samtaler med jer.","b":0,"r":"High","i":"Medium"},"8.2.4":{"a":2,"t":"Kontakt med prøve-tenants i Teams","w":"Kommunikation med trial-tenant konti er begrænset. Forhindrer kontakt med midlertidige konti der ofte bruges i angreb.","f":"Kommunikation med trial-tenant konti er begrænset.","n":"","b":0,"r":"High","i":"High"},"8.4.1":{"a":2,"t":"Rettigheder for apps i Teams","w":"App-tilladelser i Teams er begrænset via politik. Kun godkendte apps kan installeres og bruges i Teams-miljøet.","f":"App-tilladelser i Teams er begrænset via politik.","n":"","b":0,"r":"High","i":"Low"},"8.5.2":{"a":2,"t":"Anonyme deltagere må ikke starte møder","w":"Anonyme brugere kan ikke starte møder. Forhindrer at uvedkommende kan oprette og afholde møder i jeres Teams-miljø.","f":"Anonyme brugere kan ikke starte møder.","n":"Anonyme deltagere og indringere kan ikke starte møder.","b":0,"r":"High","i":"Low"},"8.5.3":{"a":2,"t":"Hvem går direkte ind i Teams-møder","w":"Ikke-organisationsmedlemmer placeres i venteværelset. Interne deltagere kan se og kontrollere hvem der lukkes ind i mødet.","f":"Ikke-organisationsmedlemmer placeres i venteværelset.","n":"Kun kolleger går direkte ind i Teams-møder; eksterne venter i lobbyen.","b":0,"r":"High","i":"Medium"},"8.5.4":{"a":2,"t":"Opkaldere uden om lobbyen","w":"Telefondeltagere placeres i venteværelset. Gæster der ringer ind kan ikke automatisk deltage uden godkendelse.","f":"Telefondeltagere placeres i venteværelset.","n":"","b":0,"r":"Low","i":"Medium"},"8.5.7":{"a":2,"t":"Eksterne og kontrol i møder","w":"Eksterne deltagere kan ikke give eller anmode om skærmkontrol. Forhindrer at uvedkommende overtager kontrol over en deltageres skærm.","f":"Eksterne deltagere kan ikke give eller anmode om skærmkontrol.","n":"Eksterne deltagere kan ikke give eller anmode om kontrol i møder.","b":0,"r":"High","i":"Medium"},"8.6.1":{"a":2,"t":"Brugere kan rapportere i Teams","w":"Brugere kan rapportere sikkerhedsproblemer direkte fra Teams. Giver en nem kanal til at indberette phishing og andre trusler.","f":"Brugere kan rapportere sikkerhedsproblemer direkte fra Teams.","n":"","b":0,"r":"High","i":"Medium"}};
 function srStatusOf(id) { return ((assessments[id] || {}).status) || 'none'; }
 function srNoteOf(id) { return ((assessments[id] || {}).comment) || ''; }
-const SR_RISK_RANK = { Critical: 0, High: 1, Medium: 2, Low: 3 };
+// ───────── Kunderapporter (følger de godkendte eksempler): Sikkerhedstjek og Implementeringsrapport ─────────
+const RPT_AREAS = ['Brugere & Licenser', 'Deling og samarbejde (SharePoint, OneDrive, Teams)', 'Mailsikkerhed', 'Adgangskontrol (login-regler)', 'Enheder og app-beskyttelse', 'Apps med adgang til data', 'Microsoft Defender, overvågning og databeskyttelse'];
+const RPT_AREAS_SHORT = ['Brugere & Licenser', 'Deling og samarbejde', 'Mailsikkerhed', 'Adgangskontrol (login)', 'Enheder og app-beskyttelse', 'Apps med adgang til data', 'Microsoft Defender, overvågning og databeskyttelse'];
+const RPT_PREFIX_AREA = { '1': 1, '2': 7, '3': 7, '4': 5, '5': 4, '6': 3, '7': 2, '8': 2, '9': 7 };
+const RPT_LV = {
+  crit: { lbl: 'Kritisk', col: '#DC2626', bg: '#FDE8E8', rank: 0 },
+  warn: { lbl: 'Bør ses på', col: '#D97706', bg: '#FEF3DC', rank: 1 },
+  acc:  { lbl: 'Accepteret', col: '#2563EB', bg: '#E3EEFC', rank: 2 },
+  ok:   { lbl: 'I orden', col: '#16A34A', bg: '#E4F6EA', rank: 3 }
+};
+function rptInfo(x) {
+  const d = REPORT_DA[x.check_id];
+  const st = srStatusOf(x.check_id);
+  const risk = (d && d.r) || x.risk_level || 'Medium';
+  const impact = (d && d.i) || x.impact_level || 'Medium';
+  const area = d ? d.a : (RPT_PREFIX_AREA[String(x.check_id).split('.')[0]] || 7);
+  let lv = null;
+  if (st === 'implemented') lv = 'ok';
+  else if (st === 'accepted' || st === 'option') lv = 'acc';
+  else if (st === 'declined') lv = risk === 'Critical' ? 'crit' : 'warn';
+  else if (st === 'review') lv = 'warn';
+  return {
+    id: x.check_id, st, lv, risk, impact, area,
+    title: d ? d.t : x.title,
+    why: d ? d.w : (x.rationale_short || ''),
+    first: d ? d.f : (x.rationale_short || ''),
+    note: d ? d.n : '',
+    big: d ? d.b : 0,
+    comment: srNoteOf(x.check_id)
+  };
+}
+function rptScore() {
+  try {
+    const o = JSON.parse((assessments['SECURE_SCORE'] || {}).comment || 'null');
+    if (!o || o.pct == null) return null;
+    const f = o.first || null;
+    const fmt = d => { try { return d ? new Date(d).toLocaleDateString('da-DK', { day: 'numeric', month: 'long', year: 'numeric' }) : ''; } catch (e) { return d || ''; } };
+    const hasBefore = f && f[0] && o.d && f[0] !== o.d;
+    return { now: o.pct, nowC: o.current, nowM: o.max, nowD: fmt(o.d), before: hasBefore ? f[1] : null, beforeD: hasBefore ? fmt(f[0]) : '', delta: hasBefore ? Math.round((o.pct - f[1]) * 10) / 10 : null };
+  } catch (e) { return null; }
+}
+function rptCss() {
+  return `body{font-family:Calibri,Arial,sans-serif;color:#1F2937;font-size:10.5pt;margin:0;padding:0;}
+  .page{page-break-after:always;padding:6px 0;}.page:last-child{page-break-after:auto;}
+  h2{font-size:15pt;color:#1F3864;margin:18px 0 6px;}h3{font-size:11pt;color:#1F3864;margin:12px 0 4px;}
+  table{border-collapse:collapse;width:100%;}td,th{vertical-align:top;}
+  .cover td{background:#1F3864;color:#fff;padding:30px 34px;}
+  .small{font-size:8.5pt;color:#6B7280;}
+  .tile td{background:#F3F4F6;padding:8px 12px;border-left:4px solid #fff;}.tile b{font-size:17pt;color:#1F3864;display:block;}
+  .legend td{padding:8px 10px;font-size:9pt;}
+  .ah td{padding:7px 12px;background:#EEF2F8;border:1px solid #D5DDEB;font-size:13pt;font-weight:bold;color:#1F3864;}
+  .num{background:#1F3864!important;color:#fff!important;width:34px;text-align:center;}
+  .find{margin:10px 0 2px;}.find .t{font-weight:bold;font-size:11pt;}.find .m{font-size:8.5pt;margin:1px 0 3px;}
+  .find p{margin:2px 0;}.box{background:#EEF2F8;border-left:4px solid #1F3864;padding:10px 14px;margin:12px 0;}
+  .ablk{page-break-inside:avoid;break-inside:avoid;}.amb{page-break-inside:avoid;break-inside:avoid;background:#FEF3DC;border-left:4px solid #D97706;padding:6px 12px;margin:8px 0 14px;}
+  ul{margin:3px 0 3px 18px;padding:0;}li{margin:2px 0;}
+  .ft{margin-top:14px;font-size:8pt;color:#9CA3AF;text-align:center;}
+  .grid td{padding:9px 12px;border:3px solid #fff;}
+  @page{size:A4;margin:16mm;}@media print{.page{padding:0;}}`;
+}
+function rptCover(kicker, title, sub, c, dateStr) {
+  const dom = c.domain || window._tenantDomain || '';
+  return `<table class="cover"><tr><td>
+    <div style="font-size:8.5pt;color:#F59E0B;font-weight:bold;letter-spacing:1px;">${escH(kicker)}</div><br>
+    <div style="font-size:30pt;font-weight:bold;">${escH(title)}</div>
+    <div style="font-size:13pt;color:#DBE4F5;">${escH(sub)}</div><br>
+    <div style="font-size:15pt;font-weight:bold;">${escH(c.name)}</div>
+    ${dom ? `<div style="font-size:10pt;color:#DBE4F5;">${escH(dom)}</div>` : ''}<br>
+    <div style="font-size:9.5pt;color:#DBE4F5;">Rapportdato: ${dateStr}</div><br>
+    <div style="font-size:11pt;font-weight:bold;">ADDvision</div>
+    <div style="font-size:8.5pt;color:#DBE4F5;">Din IT-partner · Herlev · Skanderborg</div>
+  </td></tr></table>`;
+}
+function rptAreaHeader(n, name, lvKey, rightText) {
+  const lv = RPT_LV[lvKey];
+  return `<table class="ah" style="margin-top:14px;"><tr><td class="num">${n}</td><td>${escH(name)}</td><td style="text-align:right;font-size:10pt;color:${lv ? lv.col : '#6B7280'};white-space:nowrap;">${lv ? '● ' : ''}${escH(rightText)}</td></tr></table>`;
+}
 
-function buildSimpleReportHtml(c, kind, lang) {
-  const T = SR_TXT[lang] || SR_TXT.da;
+function buildSimpleReportHtml(c, kind) {
   const list = scopedChecks(c);
-  const dateStr = new Date().toLocaleDateString(lang === 'en' ? 'en-GB' : 'da-DK', { day: '2-digit', month: 'long', year: 'numeric' });
-  const isOk = s => s === 'implemented' || s === 'accepted' || s === 'option';
-  const cnt = { ok: 0, open: 0, none: 0 };
-  list.forEach(x => { const s = srStatusOf(x.check_id); if (isOk(s)) cnt.ok++; else if (s === 'none') cnt.none++; else cnt.open++; });
-  const dot = col => `<span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:${col};vertical-align:middle;"></span>`;
-  const COL = { green: '#16A34A', amber: '#D97706', red: '#DC2626', grey: '#9CA3AF' };
-  const sections = [...new Set(list.map(x => x.section))];
-  const css = `body{font-family:Calibri,Arial,sans-serif;color:#111827;font-size:11pt;margin:0;padding:24px;}h1{margin:0 0 4px;font-size:24pt;color:#fff;}h2{font-size:15pt;color:#1D4ED8;margin:22px 0 8px;border-bottom:1px solid #DBEAFE;padding-bottom:4px;}
-  .hd{background:#1D4ED8;color:#DBEAFE;padding:18px 22px;border-radius:6px;}table{border-collapse:collapse;width:100%;margin:6px 0;}th{background:#EFF6FF;text-align:left;font-size:9.5pt;color:#374151;}td,th{border:1px solid #E5E7EB;padding:6px 8px;vertical-align:top;font-size:10pt;}
-  .kpi td{border:none;text-align:center;font-size:10pt;background:#F9FAFB;padding:12px;}.kpi b{display:block;font-size:20pt;}ul{margin:4px 0 4px 18px;padding:0;}li{margin:3px 0;}.mu{color:#6B7280;font-size:9.5pt;}.ft{margin-top:28px;color:#6B7280;font-size:9pt;border-top:1px solid #E5E7EB;padding-top:8px;}@media print{body{padding:0;}h2{page-break-after:avoid;}tr{page-break-inside:avoid;}}`;
-  let h = `<div class="hd"><h1>${escH(kind === 'review' ? T.review : T.impl)}</h1><div>${T.customer}: ${escH(c.name)} &nbsp;·&nbsp; ${T.date}: ${dateStr}</div><div style="font-size:9.5pt;">${T.basis}</div></div>`;
+  const infos = list.map(rptInfo);
+  const dateStr = new Date().toLocaleDateString('da-DK', { day: 'numeric', month: 'long', year: 'numeric' });
+  const byArea = n => infos.filter(i => i.area === n);
+  const css = rptCss();
+  let h = '';
 
   if (kind === 'review') {
-    h += `<h2>${T.summary}</h2><table class="kpi"><tr><td><b style="color:${COL.green}">${cnt.ok}</b>${T.ok}</td><td><b style="color:${COL.red}">${cnt.open}</b>${T.open}</td><td><b style="color:${COL.grey}">${cnt.none}</b>${T.notAssessed}</td></tr></table>`;
-    h += `<h2>${T.areas}</h2><table><tr><th>${T.area}</th><th style="width:70px">${T.light}</th><th style="width:90px">${T.okOf}</th></tr>`;
-    sections.forEach(sec => {
-      const sc = list.filter(x => x.section === sec);
-      const ok = sc.filter(x => isOk(srStatusOf(x.check_id))).length;
-      const none = sc.filter(x => srStatusOf(x.check_id) === 'none').length;
-      const crit = sc.filter(x => srStatusOf(x.check_id) === 'declined' && (x.risk_level === 'Critical' || x.risk_level === 'High')).length;
-      let col = 'green';
-      if (none === sc.length) col = 'grey'; else if (crit > 0 || ok / sc.length < 0.5) col = 'red'; else if (ok < sc.length) col = 'amber';
-      h += `<tr><td>${escH(sec)}</td><td>${dot(COL[col])} ${T[col]}</td><td>${ok} / ${sc.length}</td></tr>`;
+    const areaLv = n => {
+      const a = byArea(n).filter(i => i.lv);
+      if (!a.length) return null;
+      if (a.some(i => i.lv === 'crit')) return 'crit';
+      if (a.some(i => i.lv === 'warn')) return 'warn';
+      if (a.every(i => i.lv === 'acc' || i.lv === 'ok') && a.some(i => i.lv === 'ok')) return 'ok';
+      return 'acc';
+    };
+    // Forside + læsevejledning
+    h += `<div class="page">${rptCover('SIKKERHEDSTJEK', 'Sikkerhedstjek', 'af jeres Microsoft 365-miljø', c, dateStr)}
+      <h2>Sådan læser du rapporten</h2>
+      <p>Vi har gennemgået jeres Microsoft 365-miljø og kigget på de områder, der har størst betydning for sikkerheden i hverdagen. Rapporten er skrevet, så den kan læses uden teknisk baggrund. Til hvert punkt forklarer vi, hvad vi fandt, hvad det betyder for jer, og hvad vi anbefaler.</p>
+      <table class="legend"><tr>
+        <td style="background:${RPT_LV.crit.bg};"><b style="color:${RPT_LV.crit.col}">● Kritisk</b><br><span class="small">Bør håndteres hurtigt</span></td>
+        <td style="background:${RPT_LV.warn.bg};"><b style="color:${RPT_LV.warn.col}">● Bør ses på</b><br><span class="small">Anbefales forbedret</span></td>
+        <td style="background:${RPT_LV.acc.bg};"><b style="color:${RPT_LV.acc.col}">● Accepteret</b><br><span class="small">Bevidst valg, noteret</span></td>
+        <td style="background:${RPT_LV.ok.bg};"><b style="color:${RPT_LV.ok.col}">● I orden</b><br><span class="small">Ingen handling nødvendig</span></td>
+      </tr></table></div>`;
+    // Overblik
+    const cells = RPT_AREAS.map((nm, k) => {
+      const lk = areaLv(k + 1);
+      const lv = lk ? RPT_LV[lk] : null;
+      return `<td style="background:${lv ? lv.bg : '#F3F4F6'};width:50%;"><b>${escH(nm)}</b><br><b style="color:${lv ? lv.col : '#6B7280'};font-size:9pt;">${lv ? '● ' + lv.lbl : 'Ikke vurderet endnu'}</b></td>`;
     });
-    h += '</table>';
-    const first = list.filter(x => { const s = srStatusOf(x.check_id); return s === 'declined' || s === 'review'; })
-      .sort((a, b) => (SR_RISK_RANK[a.risk_level] ?? 9) - (SR_RISK_RANK[b.risk_level] ?? 9)).slice(0, 10);
-    h += `<h2>${T.first}</h2>`;
-    if (!first.length) h += `<p>${T.firstNone}</p>`;
-    else {
-      h += `<table><tr><th style="width:55px">ID</th><th>${T.control}</th><th style="width:70px">${T.risk}</th><th>${T.why}</th></tr>`;
-      first.forEach(x => { h += `<tr><td>${escH(x.check_id)}</td><td>${escH(x.title)}</td><td>${escH(x.risk_level || '')}</td><td>${escH(x.rationale_short || '')}</td></tr>`; });
-      h += '</table>';
-    }
-    const notes = list.filter(x => srStatusOf(x.check_id) === 'none' && /^Kunden har ikke /.test(srNoteOf(x.check_id)));
-    if (notes.length) {
-      h += `<h2>${T.note}</h2><ul>`;
-      notes.forEach(x => { h += `<li><b>${escH(x.check_id)}</b> ${escH(x.title)}<br><span class="mu">${escH(srNoteOf(x.check_id))}</span></li>`; });
-      h += '</ul>';
-    }
-  } else {
-    h += `<p>${T.implIntro}</p>`;
-    const impl = list.filter(x => srStatusOf(x.check_id) === 'implemented');
-    h += `<h2>${T.done} (${impl.length} ${T.pts})</h2>`;
-    if (!impl.length) h += `<p>${T.doneNone}</p>`;
-    sections.forEach(sec => {
-      const sc = impl.filter(x => x.section === sec);
-      if (!sc.length) return;
-      h += `<p style="margin:10px 0 2px;"><b>${escH(sec)}</b></p><ul>` + sc.map(x => `<li>${escH(x.title)}</li>`).join('') + '</ul>';
+    let grid = '';
+    for (let k = 0; k < cells.length; k += 2) grid += `<tr>${cells[k]}${cells[k + 1] || '<td></td>'}</tr>`;
+    const top = infos.filter(i => i.lv === 'crit').sort((a, b) => (a.risk === b.risk ? 0 : 0) || ((b.impact === 'High') - (a.impact === 'High'))).slice(0, 3);
+    const notAss = infos.filter(i => !i.lv).length;
+    h += `<div class="page"><h2>Overblik</h2><p>De 7 områder vi har gennemgået, med den samlede vurdering af hvert:</p>
+      ${(() => { const sc = rptScore(); return sc ? `<table class="tile" style="margin:6px 0 10px;"><tr><td><b>${String(sc.now).replace('.', ',')} %</b><span class="small">Secure Score (${sc.nowC} af ${sc.nowM} point) · målt ${escH(sc.nowD)}</span></td></tr></table>` : ''; })()}
+      <table class="grid">${grid}</table>
+      <div class="box"><b style="color:#1F3864;">Det vigtigste at tage fat på først</b>
+      ${top.length ? '<ol>' + top.map(i => `<li><b>${escH(i.title)}.</b> ${escH(i.first)}</li>`).join('') + '</ol>' : '<p>Der er ingen kritiske fund. Se de enkelte områder for punkter, der bør ses på.</p>'}</div>
+      ${notAss ? `<p class="small">${notAss} indstillinger er endnu ikke vurderet og indgår ikke i rapporten.</p>` : ''}</div>`;
+    const REPORT_NEXT = `<div class="box"><b style="color:#1F3864;">Hvad sker der nu?</b><p>Vi foreslår et kort møde, hvor vi sammen prioriterer fundene og lægger en plan. De vigtigste punkter kan vi typisk få på plads hurtigt, og de løfter sikkerheden markant. Kontakt din faste kontaktperson hos ADDvision, så tager vi den derfra.</p></div>`;
+    // Områder
+    RPT_AREAS.forEach((nm, k) => {
+      const a = byArea(k + 1);
+      const assessed = a.filter(i => i.lv);
+      if (!a.length) return;
+      const lk = areaLv(k + 1);
+      const cnt = key => assessed.filter(i => i.lv === key).length;
+      h += `<div class="page">${rptAreaHeader(k + 1, nm, lk, lk ? RPT_LV[lk].lbl : 'Ikke vurderet endnu')}
+        <table class="tile" style="margin:10px 0;"><tr>
+          <td><b>${assessed.length}</b><span class="small">Vurderet</span></td>
+          <td><b style="color:${RPT_LV.crit.col}">${cnt('crit')}</b><span class="small">Kritiske</span></td>
+          <td><b style="color:${RPT_LV.warn.col}">${cnt('warn')}</b><span class="small">Bør ses på</span></td>
+          <td><b style="color:${RPT_LV.ok.col}">${cnt('ok') + cnt('acc')}</b><span class="small">I orden / accepteret</span></td></tr></table>`;
+      if (!assessed.length) h += '<p>Dette område er endnu ikke vurderet.</p>';
+      const openAll = assessed.filter(i => i.lv !== 'ok').sort((x, y) => RPT_LV[x.lv].rank - RPT_LV[y.lv].rank || ((y.impact === 'High') - (x.impact === 'High')));
+      const open = openAll.slice(0, 5);
+      const shortWhy = t => { const sn = String(t || '').split(/(?<=[.!?])\s/).slice(0, 2).join(' '); return sn.length > 230 ? sn.slice(0, 227).replace(/\s\S*$/, '') + '…' : sn; };
+      open.forEach(i => {
+        const lv = RPT_LV[i.lv];
+        const stTxt = i.st === 'declined' ? 'Ikke på plads' : i.st === 'review' ? 'Under vurdering' : i.st === 'option' ? 'Tilvalg' : 'Accepteret';
+        const reco = i.lv === 'acc'
+          ? 'I har valgt at beholde den nuværende opsætning. Vi har noteret det som et bevidst valg.' + (i.comment ? ' (' + i.comment + ')' : '')
+          : 'Vi anbefaler at sætte denne indstilling op.' + (i.note ? ' ' + i.note : '');
+        h += `<div class="find"><div class="t"><span style="color:${lv.col}">●</span> ${escH(i.title)}</div>
+          <div class="m" style="color:${lv.col}">${lv.lbl} · Status: ${stTxt}</div>
+          <p><b>Hvad det betyder:</b> ${escH(shortWhy(i.why))}</p>
+          <p><b style="color:#1F3864;">Vores anbefaling:</b> ${escH(reco)}</p></div>`;
+      });
+      const oks = assessed.filter(i => i.lv === 'ok');
+      if (openAll.length > open.length) h += `<p class="small" style="margin-top:8px;">Derudover er der ${openAll.length - open.length} mindre punkter i området, som vi gennemgår sammen med jer.</p>`;
+      if (oks.length) h += `<p style="margin-top:8px;"><span style="color:${RPT_LV.ok.col}">●</span> <b>${oks.length} indstillinger er i orden</b> i dette område.</p>`;
+      if (k === 6) h += REPORT_NEXT;
+      h += '</div>';
     });
-    const felt = impl.filter(x => x.impact_level === 'High');
-    h += `<h2>${T.users}</h2>`;
-    if (!felt.length) h += `<p>${T.usersNone}</p>`;
-    else {
-      h += `<p>${T.usersIntro}</p><ul>` + felt.map(x => `<li>${escH(x.title)}` + (lang === 'en' && x.impact_short ? `<br><span class="mu">${escH(x.impact_short.slice(0, 220))}</span>` : '') + '</li>').join('') + '</ul>';
-    }
-    const agreed = list.filter(x => { const s = srStatusOf(x.check_id); return s === 'accepted' || s === 'option'; });
-    h += `<h2>${T.agreed}</h2>`;
-    if (!agreed.length) h += `<p>${T.agreedNone}</p>`;
-    else {
-      h += `<p>${T.agreedIntro}</p><ul>` + agreed.map(x => `<li>${escH(x.title)}` + (srNoteOf(x.check_id) ? `<br><span class="mu">${escH(srNoteOf(x.check_id))}</span>` : '') + '</li>').join('') + '</ul>';
-    }
-    const miss = list.filter(x => { const s = srStatusOf(x.check_id); return s === 'declined' || s === 'review'; })
-      .sort((a, b) => (SR_RISK_RANK[a.risk_level] ?? 9) - (SR_RISK_RANK[b.risk_level] ?? 9));
-    h += `<h2>${T.next}</h2>`;
-    if (!miss.length) h += `<p>${T.nextNone}</p>`;
-    else h += '<ul>' + miss.map(x => `<li>${escH(x.title)}</li>`).join('') + '</ul>';
+    return { css, body: h, title: 'Sikkerhedstjek – ' + c.name };
   }
-  h += `<div class="ft">${T.foot}</div>`;
-  return { css, body: h, title: (kind === 'review' ? T.review : T.impl) + ' – ' + c.name };
+
+  // ── Implementeringsrapport ──
+  const impl = infos.filter(i => i.st === 'implemented');
+  const felt = impl.filter(i => i.note);
+  const warned = impl.filter(i => i.big);
+  h += `<div class="page">${rptCover('IMPLEMENTERINGSRAPPORT', 'Implementeringsrapport', 'Premium SMB', c, dateStr)}
+    <h2>Sådan læser du rapporten</h2>
+    <p>Rapporten fortæller, hvad ADDvision har sat op i jeres Microsoft 365-miljø, hvad det betyder for jeres medarbejdere i hverdagen, og hvad der er aftalt med jer. Den er skrevet, så den kan læses uden teknisk baggrund.</p>
+    <table class="tile" style="margin:14px 0;"><tr>
+      <td><b>${impl.length}</b><span class="small">indstillinger sat op i alt</span></td>
+      <td><b>${felt.length}</b><span class="small">kan mærkes af medarbejdere</span></td>
+      </tr></table>
+    ${(() => { const sc = rptScore(); if (!sc) return ''; const n = v => String(v).replace('.', ',');
+      return sc.before != null
+        ? `<div class="box"><b style="color:#1F3864;">Forbedring i Secure Score</b><p>Microsoft Secure Score måler, hvor godt jeres Microsoft 365 er beskyttet. Den er gået fra <b>${n(sc.before)} %</b> (${escH(sc.beforeD)}) til <b>${n(sc.now)} %</b> (${escH(sc.nowD)})${sc.delta > 0 ? ', altså <b>+' + n(sc.delta) + ' procentpoint</b>' : ''}.</p></div>`
+        : `<div class="box"><b style="color:#1F3864;">Secure Score</b><p>Jeres Microsoft Secure Score er i dag <b>${n(sc.now)} %</b> (${sc.nowC} af ${sc.nowM} point, målt ${escH(sc.nowD)}). Næste måling viser forbedringen efter implementeringen.</p></div>`; })()}
+    </div>`;
+  h += '<div class="page">';
+  RPT_AREAS.forEach((nm, k) => {
+    const a = impl.filter(i => i.area === k + 1);
+    const tot = byArea(k + 1).filter(i => i.lv).length;
+    if (!byArea(k + 1).length) return;
+    const nmShort = RPT_AREAS_SHORT[k];
+    h += '<div class="ablk">' + rptAreaHeader(k + 1, nmShort, a.length ? 'ok' : null, a.length ? 'Sat op' : 'Ikke sat op endnu');
+    if (a.length) {
+      const sorted = a.slice().sort((x, y) => ((y.risk === 'Critical') - (x.risk === 'Critical')) || ((y.impact === 'High') - (x.impact === 'High')));
+      h += `<h3>Det har vi sat op</h3><ul>` + sorted.slice(0, 6).map(i => `<li>${escH(i.first)}</li>`).join('') + '</ul>';
+      h += `<p class="small">${a.length} indstillinger i alt i dette område.</p>`;
+      const f = a.filter(i => i.note);
+      if (f.length) {
+        h += `<div class="amb"><b style="color:#B45309;">Det kan medarbejderne opleve</b><ul>` + f.slice(0, 6).map(i => `<li>${escH(i.note)}</li>`).join('') + '</ul>'
+          + (f.length > 6 ? `<p class="small"><i>Derudover er der ${f.length - 6} mindre ændringer, som medarbejderne sjældent lægger mærke til.</i></p>` : '') + '</div>';
+      } else h += '<br>';
+    } else h += '<p>Der er endnu ikke sat indstillinger op i dette område.</p>';
+    h += '</div>';
+  });
+  h += `<div style="margin-top:14px;">
+    <h2>Det vi har aftalt med jer</h2>
+    <table style="border:1px solid #D1D5DB;">
+      ${[['Aftalte undtagelser', '[Udfyldes]'], ['Kontaktperson hos jer', '[Navn og e-mail]'], ['Kontaktperson hos ADDvision', '[Navn og e-mail]']].map(r => `<tr><td style="padding:6px 8px;border-top:1px solid #E5E7EB;width:42%;"><b>${r[0]}</b></td><td style="padding:6px 8px;border-top:1px solid #E5E7EB;">${r[1]}</td></tr>`).join('')}
+    </table>
+    <h2>Hvad sker der fremover?</h2>
+    <table style="border:1px solid #D1D5DB;">
+      ${[['Løbende', 'Vi overvåger trusler og sikkerhedsadvarsler og griber ind, hvis noget kræver handling.'], ['Hvert kvartal', 'Vi kører en samlet gennemgang af jeres opsætning og sender en opdateret rapport. Inaktive gæster og administratorroller gennemgås.'], ['Hvert halve år', 'Vi gennemgår login-reglerne og rydder op i ubrugte teams og grupper.']].map(r => `<tr><td style="padding:6px 8px;border-top:1px solid #E5E7EB;width:22%;"><b>${r[0]}</b></td><td style="padding:6px 8px;border-top:1px solid #E5E7EB;">${r[1]}</td></tr>`).join('')}
+    </table>
+    <div class="box"><b style="color:#1F3864;">Har I spørgsmål eller ønsker ændringer?</b>
+    <p>Kontakt din faste kontaktperson hos ADDvision. Hvis medarbejdere oplever noget, der ikke virker som forventet, kan I kontakte os, så ser vi på det med det samme.</p></div></div>`;
+  return { css, body: h, title: 'Implementeringsrapport Premium SMB – ' + c.name };
 }
 
 function exportSimpleReport(spId, kind, fmt) {
   const c = customers.find(x => x.spId === spId);
   if (!c) return;
-  const sel = document.getElementById('sr-lang-' + kind + '-' + spId);
-  const lang = sel ? sel.value : 'da';
+  const lang = 'da';
   try {
-    const r = buildSimpleReportHtml(c, kind, lang);
+    const r = buildSimpleReportHtml(c, kind);
     const safe = (r.title || 'rapport').replace(/[^\wæøåÆØÅ\- ]+/g, '').trim().replace(/\s+/g, '_');
     if (fmt === 'word') {
       const doc = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"><title>${escH(r.title)}</title><style>${r.css}</style></head><body>${r.body}</body></html>`;
@@ -26216,7 +26340,7 @@ function exportSimpleReport(spId, kind, fmt) {
   } catch (e) { showToast('Kunne ikke lave rapporten: ' + e.message, 'error'); }
 }
 function simpleReportActions(id, kind) {
-  return `<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:6px;"><select id="sr-lang-${kind}-${id}" class="btn btn-sm" style="padding:6px 8px;"><option value="da">Dansk</option><option value="en">English</option></select><button class="btn btn-primary btn-sm" onclick="exportSimpleReport('${id}','${kind}','word')">Hent Word</button><button class="btn btn-sm btn-success" onclick="exportSimpleReport('${id}','${kind}','pdf')">Hent PDF</button></div>`;
+  return `<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:6px;"><button class="btn btn-primary btn-sm" onclick="exportSimpleReport('${id}','${kind}','word')">Hent Word</button><button class="btn btn-sm btn-success" onclick="exportSimpleReport('${id}','${kind}','pdf')">Hent PDF</button></div>`;
 }
 
 function reportCardsHtml(c) {
