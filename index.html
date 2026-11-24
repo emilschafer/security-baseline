@@ -24171,7 +24171,7 @@ function missingReviewScopes(tok) {
 }
 
 async function doReviewLogin() {
-  const APP_BUILD = 'Build 2026-11-24 z (pænere rapport)';
+  const APP_BUILD = 'Build 2026-11-24 z3 (ny forside + manuel Secure Score)';
   console.log('Security Baseline Tracker', APP_BUILD);
   try { logReview('BUILD', 'implemented', APP_BUILD); } catch (e) {}
   try {
@@ -26139,10 +26139,16 @@ function rptInfo(x) {
 }
 function rptScore() {
   try {
-    const o = JSON.parse((assessments['SECURE_SCORE'] || {}).comment || 'null');
+    let o = JSON.parse((assessments['SECURE_SCORE'] || {}).comment || 'null');
+    if ((!o || o.pct == null) && window._rptScoreNew != null && !isNaN(window._rptScoreNew)) o = { pct: window._rptScoreNew, d: new Date().toISOString() };
     if (!o || o.pct == null) return null;
     const f = o.first || null;
     const fmt = d => { try { return d ? new Date(d).toLocaleDateString('da-DK', { day: 'numeric', month: 'long', year: 'numeric' }) : ''; } catch (e) { return d || ''; } };
+    const ov = window._rptScoreNew;
+    if (ov != null && !isNaN(ov)) {
+      const hb = !!(f && f[0] && f[1] != null);
+      return { now: ov, nowC: null, nowM: null, nowD: fmt(new Date().toISOString()), before: hb ? f[1] : null, beforeD: hb ? fmt(f[0]) : '', delta: hb ? Math.round((ov - f[1]) * 10) / 10 : null };
+    }
     const hasBefore = f && f[0] && o.d && f[0] !== o.d;
     return { now: o.pct, nowC: o.current, nowM: o.max, nowD: fmt(o.d), before: hasBefore ? f[1] : null, beforeD: hasBefore ? fmt(f[0]) : '', delta: hasBefore ? Math.round((o.pct - f[1]) * 10) / 10 : null };
   } catch (e) { return null; }
@@ -26160,7 +26166,7 @@ function rptCss() {
   .num{background:#1F3864!important;color:#fff!important;width:34px;text-align:center;}
   .find{margin:10px 0 2px;}.find .t{font-weight:bold;font-size:11pt;}.find .m{font-size:8.5pt;margin:1px 0 3px;}
   .find p{margin:2px 0;}.box{background:#EEF2F8;border-left:4px solid #1F3864;padding:10px 14px;margin:12px 0;}
-  .ablk{page-break-inside:avoid;break-inside:avoid;}.amb{page-break-inside:avoid;break-inside:avoid;background:#FEF3DC;border-left:4px solid #D97706;padding:6px 12px;margin:8px 0 14px;}
+  .ablk{margin-top:6px;}li{page-break-inside:avoid;break-inside:avoid;}h3{page-break-after:avoid;break-after:avoid;}.amb{page-break-inside:avoid;break-inside:avoid;background:#FEF3DC;border-left:4px solid #D97706;padding:6px 12px;margin:8px 0 14px;}
   ol{margin:3px 0 3px 20px;padding:0;}.find{page-break-inside:avoid;break-inside:avoid;}.areahd{page-break-inside:avoid;break-inside:avoid;page-break-after:avoid;break-after:avoid;}.stat{font-size:9.5pt;color:#4B5563;margin:6px 0 2px;}
   ul{margin:3px 0 3px 18px;padding:0;}li{margin:2px 0;}
   .ft{margin-top:14px;font-size:8pt;color:#9CA3AF;text-align:center;}
@@ -26261,7 +26267,7 @@ function buildSimpleReportHtml(c, kind) {
       if (k === 6) h += REPORT_NEXT;
       h += '</div>';
     });
-    return { css, body: h, title: 'Sikkerhedstjek – ' + c.name };
+    return { css, body: h, title: 'Sikkerhedstjek – ' + c.name + ' [z3]' };
   }
 
   // ── Implementeringsrapport ──
@@ -26276,17 +26282,23 @@ function buildSimpleReportHtml(c, kind) {
       <td><b>${felt.length}</b><span class="small">kan mærkes af medarbejdere</span></td>
       </tr></table>
     ${(() => { const sc = rptScore(); if (!sc) return ''; const n = v => String(v).replace('.', ',');
+      const big = (lbl, val, sub, col, bg) => `<td bgcolor="${bg}" style="background:${bg};padding:12px 16px;width:42%;"><div style="font-size:9pt;color:#4B5563;">${lbl}</div><div style="font-size:28pt;font-weight:bold;color:${col};">${n(val)} %</div><div class="small">${sub}</div></td>`;
       return sc.before != null
-        ? `<div class="box"><b style="color:#1F3864;">Forbedring i Secure Score</b><p>Microsoft Secure Score måler, hvor godt jeres Microsoft 365 er beskyttet. Den er gået fra <b>${n(sc.before)} %</b> (${escH(sc.beforeD)}) til <b>${n(sc.now)} %</b> (${escH(sc.nowD)})${sc.delta > 0 ? ', altså <b>+' + n(sc.delta) + ' procentpoint</b>' : ''}.</p></div>`
-        : `<div class="box"><b style="color:#1F3864;">Secure Score</b><p>Jeres Microsoft Secure Score er i dag <b>${n(sc.now)} %</b> (${sc.nowC} af ${sc.nowM} point, målt ${escH(sc.nowD)}). Næste måling viser forbedringen efter implementeringen.</p></div>`; })()}
+        ? `<h2>Jeres Secure Score</h2><p>Microsoft Secure Score måler, hvor godt jeres Microsoft 365 er beskyttet. Jo højere, jo bedre.</p>
+           <table style="margin:6px 0 10px;"><tr>${big('Før (' + escH(sc.beforeD) + ')', sc.before, 'da vi startede', '#6B7280', '#F3F4F6')}<td style="text-align:center;font-size:22pt;color:#16A34A;width:16%;">→</td>${big('Nu (' + escH(sc.nowD) + ')', sc.now, sc.delta > 0 ? '+' + n(sc.delta) + ' procentpoint' : 'efter implementeringen', '#16A34A', '#E4F6EA')}</tr></table>`
+        : `<h2>Jeres Secure Score</h2><table style="margin:6px 0 10px;"><tr>${big('I dag (' + escH(sc.nowD) + ')', sc.now, 'Næste måling viser forbedringen efter implementeringen', '#1F3864', '#EEF2F8')}<td></td></tr></table>`; })()}
+    <h2>Det vi har sat op – overblik</h2>
+    <table style="border:1px solid #D1D5DB;margin-top:6px;">
+      ${RPT_AREAS_SHORT.map((nm, k) => { const t = byArea(k + 1).length ? impl.filter(i => i.area === k + 1).length : null; return t === null ? '' : `<tr><td style="padding:5px 10px;border-bottom:1px solid #E5E7EB;"><b style="color:#1F3864;">${k + 1}</b> &nbsp;${escH(nm)}</td><td style="padding:5px 10px;border-bottom:1px solid #E5E7EB;text-align:right;white-space:nowrap;color:${t ? '#16A34A' : '#6B7280'};"><b>${t}</b> ${t === 1 ? 'indstilling' : 'indstillinger'}</td></tr>`; }).join('')}
+    </table>
     </div>`;
-  h += '<div class="page">';
+  h += '<div>';
   RPT_AREAS.forEach((nm, k) => {
     const a = impl.filter(i => i.area === k + 1);
     const tot = byArea(k + 1).filter(i => i.lv).length;
     if (!byArea(k + 1).length) return;
     const nmShort = RPT_AREAS_SHORT[k];
-    h += '<div class="ablk">' + rptAreaHeader(k + 1, nmShort, a.length ? 'ok' : null, a.length ? 'Sat op' : 'Ikke sat op endnu');
+    h += '<div class="ablk"><div class="areahd">' + rptAreaHeader(k + 1, nmShort, a.length ? 'ok' : null, a.length ? 'Sat op' : 'Ikke sat op endnu') + '</div>';
     if (a.length) {
       const sorted = a.slice().sort((x, y) => ((y.risk === 'Critical') - (x.risk === 'Critical')) || ((y.impact === 'High') - (x.impact === 'High')));
       h += `<h3>Det har vi sat op</h3><ul>` + sorted.slice(0, 6).map(i => `<li>${escH(i.first)}</li>`).join('') + '</ul>';
@@ -26310,10 +26322,18 @@ function buildSimpleReportHtml(c, kind) {
     </table>
     <div class="box"><b style="color:#1F3864;">Har I spørgsmål eller ønsker ændringer?</b>
     <p>Kontakt din faste kontaktperson hos ADDvision. Hvis medarbejdere oplever noget, der ikke virker som forventet, kan I kontakte os, så ser vi på det med det samme.</p></div></div>`;
-  return { css, body: h, title: 'Implementeringsrapport – ' + c.name };
+  return { css, body: h, title: 'Implementeringsrapport – ' + c.name + ' [z3]' };
 }
 
 async function exportSimpleReport(spId, kind, fmt) {
+  window._rptScoreNew = null;
+  if (kind === 'impl') {
+    const c0 = customers.find(x => x.spId === spId);
+    const v = prompt('Skriv jeres NYE Secure Score i procent (fx 71,5).\n"Før"-scoren hentes automatisk fra første Start review.\nLad feltet stå tomt for at bruge den seneste målte score.', '');
+    if (v === null) return; // Annuller
+    const num = parseFloat(String(v).replace(',', '.').replace('%', '').trim());
+    window._rptScoreNew = isNaN(num) ? null : num;
+  }
   // Hent ALTID den valgte kundes egne vurderinger (ellers bliver rapporten tom, hvis kunden ikke er åbnet)
   const prev = assessments;
   const pw = fmt === 'pdf' ? window.open('', '_blank') : null; // åbnes før hentning, så pop-up ikke blokeres
@@ -26329,7 +26349,7 @@ async function exportSimpleReport(spId, kind, fmt) {
     }
     _exportSimpleReportNow(spId, kind, fmt, pw);
   } catch (e) { if (pw) pw.close(); showToast('Fejl: ' + e.message, 'error'); }
-  finally { assessments = prev; }
+  finally { assessments = prev; window._rptScoreNew = null; }
 }
 function _exportSimpleReportNow(spId, kind, fmt, pw) {
   const c = customers.find(x => x.spId === spId);
