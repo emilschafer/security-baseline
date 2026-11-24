@@ -24171,7 +24171,7 @@ function missingReviewScopes(tok) {
 }
 
 async function doReviewLogin() {
-  const APP_BUILD = 'Build 2026-11-24 z6 (Secure Score robust)';
+  const APP_BUILD = 'Build 2026-11-24 z7 (uden aftalt/fremover)';
   console.log('Security Baseline Tracker', APP_BUILD);
   try { logReview('BUILD', 'implemented', APP_BUILD); } catch (e) {}
   try {
@@ -26317,14 +26317,6 @@ function buildSimpleReportHtml(c, kind) {
     h += '</div>';
   });
   h += `<div style="margin-top:14px;">
-    <h2>Det vi har aftalt med jer</h2>
-    <table style="border:1px solid #D1D5DB;">
-      ${[['Aftalte undtagelser', '[Udfyldes]'], ['Kontaktperson hos jer', '[Navn og e-mail]'], ['Kontaktperson hos ADDvision', '[Navn og e-mail]']].map(r => `<tr><td style="padding:6px 8px;border-top:1px solid #E5E7EB;width:42%;"><b>${r[0]}</b></td><td style="padding:6px 8px;border-top:1px solid #E5E7EB;">${r[1]}</td></tr>`).join('')}
-    </table>
-    <h2>Hvad sker der fremover?</h2>
-    <table style="border:1px solid #D1D5DB;">
-      ${[['Løbende', 'Vi overvåger trusler og sikkerhedsadvarsler og griber ind, hvis noget kræver handling.'], ['Hvert kvartal', 'Vi kører en samlet gennemgang af jeres opsætning og sender en opdateret rapport. Inaktive gæster og administratorroller gennemgås.'], ['Hvert halve år', 'Vi gennemgår login-reglerne og rydder op i ubrugte teams og grupper.']].map(r => `<tr><td style="padding:6px 8px;border-top:1px solid #E5E7EB;width:22%;"><b>${r[0]}</b></td><td style="padding:6px 8px;border-top:1px solid #E5E7EB;">${r[1]}</td></tr>`).join('')}
-    </table>
     <div class="box"><b style="color:#1F3864;">Har I spørgsmål eller ønsker ændringer?</b>
     <p>Kontakt din faste kontaktperson hos ADDvision. Hvis medarbejdere oplever noget, der ikke virker som forventet, kan I kontakte os, så ser vi på det med det samme.</p></div></div>`;
   return { css, body: h, title: 'Implementeringsrapport – ' + c.name + '' };
