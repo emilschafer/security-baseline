@@ -24171,7 +24171,7 @@ function missingReviewScopes(tok) {
 }
 
 async function doReviewLogin() {
-  const APP_BUILD = 'Build 2026-11-23 y (uden Premium SMB i rapport)';
+  const APP_BUILD = 'Build 2026-11-24 z (pænere rapport)';
   console.log('Security Baseline Tracker', APP_BUILD);
   try { logReview('BUILD', 'implemented', APP_BUILD); } catch (e) {}
   try {
@@ -26148,11 +26148,11 @@ function rptScore() {
   } catch (e) { return null; }
 }
 function rptCss() {
-  return `body{font-family:Calibri,Arial,sans-serif;color:#1F2937;font-size:10.5pt;margin:0;padding:0;}
+  return `*{-webkit-print-color-adjust:exact;print-color-adjust:exact;}body{font-family:Calibri,Arial,sans-serif;color:#1F2937;font-size:10.5pt;margin:0;padding:0;}
   .page{page-break-after:always;padding:6px 0;}.page:last-child{page-break-after:auto;}
   h2{font-size:15pt;color:#1F3864;margin:18px 0 6px;}h3{font-size:11pt;color:#1F3864;margin:12px 0 4px;}
   table{border-collapse:collapse;width:100%;}td,th{vertical-align:top;}
-  .cover td{background:#1F3864;color:#fff;padding:30px 34px;}
+  .cover td{background:#1F3864;color:#fff;padding:22px 30px;}.cover div{color:inherit;}
   .small{font-size:8.5pt;color:#6B7280;}
   .tile td{background:#F3F4F6;padding:8px 12px;border-left:4px solid #fff;}.tile b{font-size:17pt;color:#1F3864;display:block;}
   .legend td{padding:8px 10px;font-size:9pt;}
@@ -26161,6 +26161,7 @@ function rptCss() {
   .find{margin:10px 0 2px;}.find .t{font-weight:bold;font-size:11pt;}.find .m{font-size:8.5pt;margin:1px 0 3px;}
   .find p{margin:2px 0;}.box{background:#EEF2F8;border-left:4px solid #1F3864;padding:10px 14px;margin:12px 0;}
   .ablk{page-break-inside:avoid;break-inside:avoid;}.amb{page-break-inside:avoid;break-inside:avoid;background:#FEF3DC;border-left:4px solid #D97706;padding:6px 12px;margin:8px 0 14px;}
+  ol{margin:3px 0 3px 20px;padding:0;}.find{page-break-inside:avoid;break-inside:avoid;}.areahd{page-break-inside:avoid;break-inside:avoid;page-break-after:avoid;break-after:avoid;}.stat{font-size:9.5pt;color:#4B5563;margin:6px 0 2px;}
   ul{margin:3px 0 3px 18px;padding:0;}li{margin:2px 0;}
   .ft{margin-top:14px;font-size:8pt;color:#9CA3AF;text-align:center;}
   .grid td{padding:9px 12px;border:3px solid #fff;}
@@ -26168,7 +26169,7 @@ function rptCss() {
 }
 function rptCover(kicker, title, sub, c, dateStr) {
   const dom = c.domain || window._tenantDomain || '';
-  return `<table class="cover"><tr><td>
+  return `<table class="cover"><tr><td bgcolor="#1F3864" style="background:#1F3864;color:#ffffff;">
     <div style="font-size:8.5pt;color:#F59E0B;font-weight:bold;letter-spacing:1px;">${escH(kicker)}</div><br>
     <div style="font-size:30pt;font-weight:bold;">${escH(title)}</div>
     <div style="font-size:13pt;color:#DBE4F5;">${escH(sub)}</div><br>
@@ -26210,7 +26211,7 @@ function buildSimpleReportHtml(c, kind) {
         <td style="background:${RPT_LV.warn.bg};"><b style="color:${RPT_LV.warn.col}">● Bør ses på</b><br><span class="small">Anbefales forbedret</span></td>
         <td style="background:${RPT_LV.acc.bg};"><b style="color:${RPT_LV.acc.col}">● Accepteret</b><br><span class="small">Bevidst valg, noteret</span></td>
         <td style="background:${RPT_LV.ok.bg};"><b style="color:${RPT_LV.ok.col}">● I orden</b><br><span class="small">Ingen handling nødvendig</span></td>
-      </tr></table></div>`;
+      </tr></table>`;
     // Overblik
     const cells = RPT_AREAS.map((nm, k) => {
       const lk = areaLv(k + 1);
@@ -26219,15 +26220,17 @@ function buildSimpleReportHtml(c, kind) {
     });
     let grid = '';
     for (let k = 0; k < cells.length; k += 2) grid += `<tr>${cells[k]}${cells[k + 1] || '<td></td>'}</tr>`;
-    const top = infos.filter(i => i.lv === 'crit').sort((a, b) => (a.risk === b.risk ? 0 : 0) || ((b.impact === 'High') - (a.impact === 'High'))).slice(0, 3);
+    const impSort = (a, b) => ((b.impact === 'High') - (a.impact === 'High'));
+    let top = infos.filter(i => i.lv === 'crit').sort(impSort).slice(0, 3);
+    if (top.length < 3) top = top.concat(infos.filter(i => i.lv === 'warn').sort(impSort).slice(0, 3 - top.length));
     const notAss = infos.filter(i => !i.lv).length;
-    h += `<div class="page"><h2>Overblik</h2><p>De 7 områder vi har gennemgået, med den samlede vurdering af hvert:</p>
+    h += `<h2>Overblik</h2><p>De 7 områder vi har gennemgået, med den samlede vurdering af hvert:</p>
       ${(() => { const sc = rptScore(); return sc ? `<table class="tile" style="margin:6px 0 10px;"><tr><td><b>${String(sc.now).replace('.', ',')} %</b><span class="small">Secure Score (${sc.nowC} af ${sc.nowM} point) · målt ${escH(sc.nowD)}</span></td></tr></table>` : ''; })()}
       <table class="grid">${grid}</table>
       <div class="box"><b style="color:#1F3864;">Det vigtigste at tage fat på først</b>
-      ${top.length ? '<ol>' + top.map(i => `<li><b>${escH(i.title)}.</b> ${escH(i.first)}</li>`).join('') + '</ol>' : '<p>Der er ingen kritiske fund. Se de enkelte områder for punkter, der bør ses på.</p>'}</div>
+      ${top.length ? '<ol>' + top.map(i => `<li><b>${escH(i.title)}.</b> ${escH(i.first)}</li>`).join('') + '</ol>' : '<p>Der er ingen fund, der kræver handling lige nu.</p>'}</div>
       ${notAss ? `<p class="small">${notAss} indstillinger er endnu ikke vurderet og indgår ikke i rapporten.</p>` : ''}</div>`;
-    const REPORT_NEXT = `<div class="box"><b style="color:#1F3864;">Hvad sker der nu?</b><p>Vi foreslår et kort møde, hvor vi sammen prioriterer fundene og lægger en plan. De vigtigste punkter kan vi typisk få på plads hurtigt, og de løfter sikkerheden markant. Kontakt din faste kontaktperson hos ADDvision, så tager vi den derfra.</p></div>`;
+    const REPORT_NEXT = `<div class="box" style="page-break-inside:avoid;break-inside:avoid;"><b style="color:#1F3864;">Hvad sker der nu?</b><p>Vi foreslår et kort møde, hvor vi sammen prioriterer fundene og lægger en plan. De vigtigste punkter kan vi typisk få på plads hurtigt, og de løfter sikkerheden markant. Kontakt din faste kontaktperson hos ADDvision, så tager vi den derfra.</p></div>`;
     // Områder
     RPT_AREAS.forEach((nm, k) => {
       const a = byArea(k + 1);
@@ -26235,12 +26238,8 @@ function buildSimpleReportHtml(c, kind) {
       if (!a.length) return;
       const lk = areaLv(k + 1);
       const cnt = key => assessed.filter(i => i.lv === key).length;
-      h += `<div class="page">${rptAreaHeader(k + 1, nm, lk, lk ? RPT_LV[lk].lbl : 'Ikke vurderet endnu')}
-        <table class="tile" style="margin:10px 0;"><tr>
-          <td><b>${assessed.length}</b><span class="small">Vurderet</span></td>
-          <td><b style="color:${RPT_LV.crit.col}">${cnt('crit')}</b><span class="small">Kritiske</span></td>
-          <td><b style="color:${RPT_LV.warn.col}">${cnt('warn')}</b><span class="small">Bør ses på</span></td>
-          <td><b style="color:${RPT_LV.ok.col}">${cnt('ok') + cnt('acc')}</b><span class="small">I orden / accepteret</span></td></tr></table>`;
+      h += `<div style="${k === 0 || !h.includes('data-area') ? 'page-break-before:always;' : ''}" data-area="1"><div class="areahd">${rptAreaHeader(k + 1, nm, lk, lk ? RPT_LV[lk].lbl : 'Ikke vurderet endnu')}
+        <div class="stat"><b>${assessed.length}</b> vurderet · <b style="color:${RPT_LV.crit.col}">${cnt('crit')}</b> kritiske · <b style="color:${RPT_LV.warn.col}">${cnt('warn')}</b> bør ses på · <b style="color:${RPT_LV.ok.col}">${cnt('ok') + cnt('acc')}</b> i orden/accepteret</div></div>`;
       if (!assessed.length) h += '<p>Dette område er endnu ikke vurderet.</p>';
       const openAll = assessed.filter(i => i.lv !== 'ok').sort((x, y) => RPT_LV[x.lv].rank - RPT_LV[y.lv].rank || ((y.impact === 'High') - (x.impact === 'High')));
       const open = openAll.slice(0, 5);
