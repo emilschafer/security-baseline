@@ -24171,7 +24171,7 @@ function missingReviewScopes(tok) {
 }
 
 async function doReviewLogin() {
-  const APP_BUILD = 'Build 2026-11-24 z5 (Secure Score spørger kun hvis før mangler)';
+  const APP_BUILD = 'Build 2026-11-24 z6 (Secure Score robust)';
   console.log('Security Baseline Tracker', APP_BUILD);
   try { logReview('BUILD', 'implemented', APP_BUILD); } catch (e) {}
   try {
@@ -26139,10 +26139,12 @@ function rptInfo(x) {
 }
 function rptScore() {
   try {
-    let o = JSON.parse((assessments['SECURE_SCORE'] || {}).comment || 'null');
+    let o = null;
+    try { o = JSON.parse((assessments['SECURE_SCORE'] || {}).comment || 'null'); } catch (e) { o = null; }
+    if (o !== null && typeof o !== 'object') o = null;
     if ((!o || o.pct == null) && window._rptScoreNew != null && !isNaN(window._rptScoreNew)) o = { pct: window._rptScoreNew, d: new Date().toISOString() };
     if (!o || o.pct == null) return null;
-    const f = o.first || null;
+    const f = (o.first && o.first.length) ? o.first : null;
     const fmt = d => { try { return d ? new Date(d).toLocaleDateString('da-DK', { day: 'numeric', month: 'long', year: 'numeric' }) : ''; } catch (e) { return d || ''; } };
     const ov = window._rptScoreNew;
     if (ov != null && !isNaN(ov)) {
@@ -26356,6 +26358,7 @@ async function exportSimpleReport(spId, kind, fmt) {
         window._rptScoreBefore = num(v2);
       }
     }
+    if (kind === 'impl') showToast(window._rptScoreNew != null ? 'Secure Score i rapporten: nu ' + window._rptScoreNew + ' %' + (window._rptScoreBefore != null ? ', før ' + window._rptScoreBefore + ' %' : '') : 'Ingen ny Secure Score indtastet – bruger gemt værdi, hvis der er en');
     _exportSimpleReportNow(spId, kind, fmt);
   } catch (e) { showToast('Fejl: ' + e.message, 'error'); }
   finally { assessments = prev; window._rptScoreNew = null; window._rptScoreBefore = null; }
