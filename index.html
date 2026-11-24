@@ -24171,7 +24171,7 @@ function missingReviewScopes(tok) {
 }
 
 async function doReviewLogin() {
-  const APP_BUILD = 'Build 2026-11-24 z3 (ny forside + manuel Secure Score)';
+  const APP_BUILD = 'Build 2026-11-24 z5 (Secure Score spørger kun hvis før mangler)';
   console.log('Security Baseline Tracker', APP_BUILD);
   try { logReview('BUILD', 'implemented', APP_BUILD); } catch (e) {}
   try {
@@ -26146,8 +26146,11 @@ function rptScore() {
     const fmt = d => { try { return d ? new Date(d).toLocaleDateString('da-DK', { day: 'numeric', month: 'long', year: 'numeric' }) : ''; } catch (e) { return d || ''; } };
     const ov = window._rptScoreNew;
     if (ov != null && !isNaN(ov)) {
-      const hb = !!(f && f[0] && f[1] != null);
-      return { now: ov, nowC: null, nowM: null, nowD: fmt(new Date().toISOString()), before: hb ? f[1] : null, beforeD: hb ? fmt(f[0]) : '', delta: hb ? Math.round((ov - f[1]) * 10) / 10 : null };
+      const ob = window._rptScoreBefore;
+      const hasOb = ob != null && !isNaN(ob);
+      const hb = hasOb || !!(f && f[0] && f[1] != null);
+      const bv = hasOb ? ob : (hb ? f[1] : null);
+      return { now: ov, nowC: null, nowM: null, nowD: fmt(new Date().toISOString()), before: bv, beforeD: hasOb ? 'start' : (hb ? fmt(f[0]) : ''), delta: hb ? Math.round((ov - bv) * 10) / 10 : null };
     }
     const hasBefore = f && f[0] && o.d && f[0] !== o.d;
     return { now: o.pct, nowC: o.current, nowM: o.max, nowD: fmt(o.d), before: hasBefore ? f[1] : null, beforeD: hasBefore ? fmt(f[0]) : '', delta: hasBefore ? Math.round((o.pct - f[1]) * 10) / 10 : null };
@@ -26267,7 +26270,7 @@ function buildSimpleReportHtml(c, kind) {
       if (k === 6) h += REPORT_NEXT;
       h += '</div>';
     });
-    return { css, body: h, title: 'Sikkerhedstjek – ' + c.name + ' [z3]' };
+    return { css, body: h, title: 'Sikkerhedstjek – ' + c.name + '' };
   }
 
   // ── Implementeringsrapport ──
@@ -26285,7 +26288,7 @@ function buildSimpleReportHtml(c, kind) {
       const big = (lbl, val, sub, col, bg) => `<td bgcolor="${bg}" style="background:${bg};padding:12px 16px;width:42%;"><div style="font-size:9pt;color:#4B5563;">${lbl}</div><div style="font-size:28pt;font-weight:bold;color:${col};">${n(val)} %</div><div class="small">${sub}</div></td>`;
       return sc.before != null
         ? `<h2>Jeres Secure Score</h2><p>Microsoft Secure Score måler, hvor godt jeres Microsoft 365 er beskyttet. Jo højere, jo bedre.</p>
-           <table style="margin:6px 0 10px;"><tr>${big('Før (' + escH(sc.beforeD) + ')', sc.before, 'da vi startede', '#6B7280', '#F3F4F6')}<td style="text-align:center;font-size:22pt;color:#16A34A;width:16%;">→</td>${big('Nu (' + escH(sc.nowD) + ')', sc.now, sc.delta > 0 ? '+' + n(sc.delta) + ' procentpoint' : 'efter implementeringen', '#16A34A', '#E4F6EA')}</tr></table>`
+           <table style="margin:6px 0 10px;"><tr>${big('Før' + (sc.beforeD && sc.beforeD !== 'start' ? ' (' + escH(sc.beforeD) + ')' : ''), sc.before, 'da vi startede', '#6B7280', '#F3F4F6')}<td style="text-align:center;font-size:22pt;color:#16A34A;width:16%;">→</td>${big('Nu (' + escH(sc.nowD) + ')', sc.now, sc.delta > 0 ? '+' + n(sc.delta) + ' procentpoint' : 'efter implementeringen', '#16A34A', '#E4F6EA')}</tr></table>`
         : `<h2>Jeres Secure Score</h2><table style="margin:6px 0 10px;"><tr>${big('I dag (' + escH(sc.nowD) + ')', sc.now, 'Næste måling viser forbedringen efter implementeringen', '#1F3864', '#EEF2F8')}<td></td></tr></table>`; })()}
     <h2>Det vi har sat op – overblik</h2>
     <table style="border:1px solid #D1D5DB;margin-top:6px;">
@@ -26322,21 +26325,13 @@ function buildSimpleReportHtml(c, kind) {
     </table>
     <div class="box"><b style="color:#1F3864;">Har I spørgsmål eller ønsker ændringer?</b>
     <p>Kontakt din faste kontaktperson hos ADDvision. Hvis medarbejdere oplever noget, der ikke virker som forventet, kan I kontakte os, så ser vi på det med det samme.</p></div></div>`;
-  return { css, body: h, title: 'Implementeringsrapport – ' + c.name + ' [z3]' };
+  return { css, body: h, title: 'Implementeringsrapport – ' + c.name + '' };
 }
 
 async function exportSimpleReport(spId, kind, fmt) {
-  window._rptScoreNew = null;
-  if (kind === 'impl') {
-    const c0 = customers.find(x => x.spId === spId);
-    const v = prompt('Skriv jeres NYE Secure Score i procent (fx 71,5).\n"Før"-scoren hentes automatisk fra første Start review.\nLad feltet stå tomt for at bruge den seneste målte score.', '');
-    if (v === null) return; // Annuller
-    const num = parseFloat(String(v).replace(',', '.').replace('%', '').trim());
-    window._rptScoreNew = isNaN(num) ? null : num;
-  }
   // Hent ALTID den valgte kundes egne vurderinger (ellers bliver rapporten tom, hvis kunden ikke er åbnet)
   const prev = assessments;
-  const pw = fmt === 'pdf' ? window.open('', '_blank') : null; // åbnes før hentning, så pop-up ikke blokeres
+  window._rptScoreNew = null; window._rptScoreBefore = null;
   try {
     if (APP_CONFIG.demoMode) { assessments = demoData.assessments[spId] || {}; }
     else {
@@ -26347,13 +26342,27 @@ async function exportSimpleReport(spId, kind, fmt) {
         .forEach(i => { fresh[i.CheckSpId] = { spId: i.spId, status: i.Status || 'none', comment: i.Comment || '' }; });
       assessments = fresh;
     }
-    _exportSimpleReportNow(spId, kind, fmt, pw);
-  } catch (e) { if (pw) pw.close(); showToast('Fejl: ' + e.message, 'error'); }
-  finally { assessments = prev; window._rptScoreNew = null; }
+    if (kind === 'impl') {
+      let stored = null;
+      try { stored = JSON.parse((assessments['SECURE_SCORE'] || {}).comment || 'null'); } catch (e) {}
+      const hasFirst = !!(stored && stored.first && stored.first[1] != null);
+      const num = t => { const x = parseFloat(String(t).replace(',', '.').replace('%', '').trim()); return isNaN(x) ? null : x; };
+      const v = prompt('Skriv jeres NYE Secure Score i procent (fx 71,5).' + (stored && stored.pct != null ? '\nSeneste gemte måling: ' + String(stored.pct).replace('.', ',') + ' %.' : '') + '\nLad feltet stå tomt for at bruge den seneste gemte score.', '');
+      if (v === null) return; // Annuller
+      window._rptScoreNew = num(v);
+      if (window._rptScoreNew != null && !hasFirst) {
+        const v2 = prompt('Der er ingen gemt "før"-score for kunden. Skriv Secure Score FØR i procent (fx 43,1).\nLad feltet stå tomt for at udelade "før".', '');
+        if (v2 === null) return;
+        window._rptScoreBefore = num(v2);
+      }
+    }
+    _exportSimpleReportNow(spId, kind, fmt);
+  } catch (e) { showToast('Fejl: ' + e.message, 'error'); }
+  finally { assessments = prev; window._rptScoreNew = null; window._rptScoreBefore = null; }
 }
-function _exportSimpleReportNow(spId, kind, fmt, pw) {
+function _exportSimpleReportNow(spId, kind, fmt) {
   const c = customers.find(x => x.spId === spId);
-  if (!c) { if (pw) pw.close(); return; }
+  if (!c) return;
   const lang = 'da';
   try {
     const r = buildSimpleReportHtml(c, kind);
@@ -26367,11 +26376,16 @@ function _exportSimpleReportNow(spId, kind, fmt, pw) {
       setTimeout(() => URL.revokeObjectURL(a.href), 4000);
       showToast('Word-dokument hentet', 'success');
     } else {
-      const w = pw || window.open('', '_blank');
-      if (!w) { showToast('Pop-up blev blokeret – tillad pop-ups for siden og prøv igen', 'error'); return; }
-      w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${escH(r.title)}</title><style>${r.css}</style></head><body>${r.body}</body></html>`);
-      w.document.close(); w.focus();
-      setTimeout(() => { try { w.print(); } catch (e) {} }, 500);
+      const fr = document.createElement('iframe');
+      fr.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;';
+      document.body.appendChild(fr);
+      const d = fr.contentWindow.document;
+      d.open(); d.write(`<!doctype html><html><head><meta charset="utf-8"><title>${escH(r.title)}</title><style>${r.css}</style></head><body>${r.body}</body></html>`); d.close();
+      const oldTitle = document.title; document.title = r.title;
+      setTimeout(() => {
+        try { fr.contentWindow.focus(); fr.contentWindow.print(); } catch (e) {}
+        setTimeout(() => { document.title = oldTitle; fr.remove(); }, 1500);
+      }, 400);
       showToast('Vælg "Gem som PDF" i udskriftsvinduet', 'success');
     }
   } catch (e) { showToast('Kunne ikke lave rapporten: ' + e.message, 'error'); }
